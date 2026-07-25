@@ -19,8 +19,8 @@ def fetch_market_data():
         tickers = ["XAGUSD=X", "XAUUSD=X", "SI=F", "DX-Y.NYB"]
         data = yf.download(tickers, period="1mo", progress=False)['Close']
         
-        # 【修正核心】使用 ffill() 自動將週末/休市的空值(NaN)以前一個交易日的價格填補
-        data = data.ffill().dropna()
+        # 【關鍵修正】：先向下填補(拿昨天的價格補今天)，再向上填補，絕不刪除整行資料
+        data = data.ffill().bfill()
         
         # 獲取最新一筆報價
         latest = data.iloc[-1]
