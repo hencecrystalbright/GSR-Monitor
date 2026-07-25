@@ -19,12 +19,15 @@ def fetch_market_data():
         tickers = ["XAGUSD=X", "XAUUSD=X", "SI=F", "DX-Y.NYB"]
         data = yf.download(tickers, period="1mo", progress=False)['Close']
         
+        # 【修正核心】使用 ffill() 自動將週末/休市的空值(NaN)以前一個交易日的價格填補
+        data = data.ffill().dropna()
+        
         # 獲取最新一筆報價
         latest = data.iloc[-1]
         
         # 歷史資料 (用於畫圖)
-        hist_spot_silver = data["XAGUSD=X"].dropna()
-        hist_gsr = (data["XAUUSD=X"] / data["XAGUSD=X"]).dropna()
+        hist_spot_silver = data["XAGUSD=X"]
+        hist_gsr = data["XAUUSD=X"] / data["XAGUSD=X"]
         
         return {
             "spot_silver": round(latest["XAGUSD=X"], 2),
@@ -53,7 +56,7 @@ sh_premium = st.sidebar.number_input(
     help="請輸入今日最新的真實溢價數據"
 )
 
-# 【新增】直接放置於輸入框正下方的醒目連結
+# 放置於輸入框正下方的醒目連結
 st.sidebar.markdown("👉 **[點此查看 GoldSilver.ai 即時溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)**")
 
 # 4. 主畫面：數據展示與邏輯判斷
@@ -69,7 +72,7 @@ if market_data:
     col4.metric("金銀比 (GSR)", f"{market_data['gsr']}")
     col5.metric("上海銀溢價 (手動)", f"{sh_premium}%")
     
-    # 【新增】在主畫面板塊右下角補上快捷連結
+    # 主畫面板塊右下角快捷連結
     st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 前往確認上海銀真實溢價</a></div>", unsafe_allow_html=True)
 
     st.markdown("---")
