@@ -44,14 +44,17 @@ market_data = fetch_market_data()
 
 # 3. 側邊欄：唯一的手動輸入區
 st.sidebar.header("📌 上海銀溢價輸入區")
-st.sidebar.markdown("[前往 GoldSilver.ai 查詢溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)")
 
+# 輸入框
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 (%)",
     value=12.22,
     step=0.1,
     help="請輸入今日最新的真實溢價數據"
 )
+
+# 【新增】直接放置於輸入框正下方的醒目連結
+st.sidebar.markdown("👉 **[點此查看 GoldSilver.ai 即時溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)**")
 
 # 4. 主畫面：數據展示與邏輯判斷
 if market_data:
@@ -65,6 +68,9 @@ if market_data:
     col4, col5 = st.columns(2)
     col4.metric("金銀比 (GSR)", f"{market_data['gsr']}")
     col5.metric("上海銀溢價 (手動)", f"{sh_premium}%")
+    
+    # 【新增】在主畫面板塊右下角補上快捷連結
+    st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 前往確認上海銀真實溢價</a></div>", unsafe_allow_html=True)
 
     st.markdown("---")
     
