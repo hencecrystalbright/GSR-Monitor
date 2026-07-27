@@ -97,6 +97,22 @@ def fetch_crypto_history(coin_id, days):
 
 @st.cache_data(ttl=1800)
 def fetch_market_data():
+def send_telegram_alert(message):
+    # 請替換為您的真實 Token 與 Chat ID
+    bot_token = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU" 
+    chat_id = "5259644398"
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown" # 支援簡單排版
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        # 即使推播失敗，也不要讓整個儀表板當機
+        pass
     errors = []
 
     try:
@@ -287,6 +303,44 @@ if market_data:
 
     if sh_premium >= premium_upper:
         st.error(f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。")
+    elif sh_premium <= premium_lower:
+        st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
+    else:
+        st.warning(f"【溢價狀態】上海銀溢價為 {sh_premium}%，處於過渡區間，需求偏強但未達極端門檻。")
+        # 🚨 當日套利與轉置建議
+    st.markdown("### 🚨 當日套利與轉置建議")
+    
+    # ... (保留您原本的日期推斷與提示文字) ...
+
+    # 初始化推播記錄，避免重新整理網頁時重複發送
+    if "alert_sent" not in st.session_state:
+        st.session_state.alert_sent = False
+
+    # GSR 判斷邏輯
+    if market_data["gsr"] >= gsr_upper:
+        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。"
+        st.error(msg)
+        if not st.session_state.alert_sent:
+            send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
+            st.session_state.alert_sent = True
+            
+    elif market_data["gsr"] <= gsr_lower:
+        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（<= {gsr_lower}）。白銀相對昂貴，建議「賣銀買金」。"
+        st.warning(msg)
+        if not st.session_state.alert_sent:
+            send_telegram_alert(f"⚠️ *戰情室快訊* ⚠️\n\n{msg}")
+            st.session_state.alert_sent = True
+    else:
+        st.info(f"【GSR 狀態】金銀比為 {market_data['gsr']}，目前位於中性區間。")
+
+    # 溢價判斷邏輯
+    if sh_premium >= premium_upper:
+        msg = f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
+        st.error(msg)
+        if not st.session_state.alert_sent:
+            send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
+            st.session_state.alert_sent = True
+            
     elif sh_premium <= premium_lower:
         st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
     else:
