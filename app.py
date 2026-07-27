@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import requests
 
 # 1. 頁面標題與配置
 st.set_page_config(
@@ -15,16 +16,21 @@ st.markdown("---")
 @st.cache_data(ttl=1800) # 30分鐘快取
 def fetch_market_data():
     try:
-        # 【終極防護】：放棄容易在雲端掉包的批次下載，改為逐一單獨抓取
-        def get_safe_data(ticker):
-            # 每次只專注抓取一個商品
-            df = yf.Ticker(ticker).history(period="1mo")
+        # 【破解機制】：建立一個帶有真實瀏覽器特徵的連線 Session，騙過 Yahoo 防火牆
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        })
+        
+        def get_safe_data(ticker_symbol):
+            # 將偽裝的 session 傳入 yfinance
+            ticker = yf.Ticker(ticker_symbol, session=session)
+            df = ticker.history(period="1mo")
             if df.empty or "Close" not in df:
-                raise ValueError(f"無法取得 {ticker} 的報價，可能遭逢假日或伺服器阻擋。")
-            # 確保只回傳乾淨的數值，過濾掉任何空洞
+                raise ValueError(f"無法取得 {ticker_symbol} 的報價，可能遭逢假日或伺服器阻擋。")
             return df["Close"].dropna()
             
-        # 依序抓取，確保穩定性
+        # 依序抓取
         s_silver = get_safe_data("XAGUSD=X")
         s_gold = get_safe_data("XAUUSD=X")
         s_comex = get_safe_data("SI=F")
@@ -40,7 +46,6 @@ def fetch_market_data():
             "hist_gsr": (s_gold / s_silver).dropna()
         }
     except Exception as e:
-        # 如果真的連線異常，把真實錯誤寫出來，不再讓它閃退
         st.error(f"連網抓取數據失敗。錯誤細節: {e}")
         return None
 
