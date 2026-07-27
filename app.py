@@ -18,9 +18,32 @@ st.markdown("---")
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-# --- 1. 初始化 Session State 記憶體防護 (解決重新整理與重新查詢重置問題) ---
+import json
+import os
+
+DATA_FILE = "data.json"
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"sh_premium": 12.22, "trading_note": ""}
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# 初始化載入 JSON 資料
+saved_data = load_data()
+
 if "sh_premium_val" not in st.session_state:
-    st.session_state.sh_premium_val = 12.22
+    st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
+
+if "trading_note_val" not in st.session_state:
+    st.session_state.trading_note_val = saved_data.get("trading_note", "")
 
 # --- Telegram 推播函數 ---
 def send_telegram_alert(message):
@@ -214,6 +237,7 @@ sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 Premium (%)", step=0.1, 
     help="請輸入今日最新的真實溢價數據",
     key="sh_premium_val"
+    on_change=update_premium_cb
 )
 st.sidebar.markdown(
     "👉 **[ 即時溢價premium中國倫敦價差](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
@@ -267,6 +291,7 @@ with st.sidebar.expander("📝 教戰手則 & 臨時筆記"):
         height=120,
         placeholder="例如：美盤開盤注意 CPI 數據...",
         key="trading_note_val"
+        on_change=update_note_cb
     )
     
 # --- 執行抓取 ---
