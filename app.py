@@ -26,11 +26,17 @@ def send_telegram_alert(message):
     payload = {
         "chat_id": chat_id,
         "text": message
-            }
+    }
     try:
-        r = requests.post(url, json=payload, timeout=5)
-        return r.status_code == 200
-    except Exception:
+        # 把逾時時間從 5 秒拉長到 10 秒，避免雲端伺服器太慢
+        r = requests.post(url, json=payload, timeout=10)
+        # 如果失敗，把 Telegram 回傳的錯誤訊息印出來
+        if r.status_code != 200:
+            st.sidebar.error(f"Telegram API 錯誤: {r.text}")
+            return False
+        return True
+    except Exception as e:
+        st.sidebar.error(f"連線異常: {e}")
         return False
 
 # --- 重大數據曆法推算模組 ---
