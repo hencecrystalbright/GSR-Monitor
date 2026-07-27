@@ -225,7 +225,7 @@ premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_v
 st.sidebar.markdown("---")
 st.sidebar.header("📱 測試推播")
 if st.sidebar.button("📤 發送 Telegram 測試訊息"):
-    success = send_telegram_alert("🔔 *這是一則來自金銀戰情室的手動測試推播！* 🚀")
+    success = send_telegram_alert("🔔 *這是一則來自金銀戰情室的手動測試推播！* 🚀你的手機自觀看後10秒後自動銷毀")
     if success:
         st.sidebar.success("推播發送成功！請檢查手機。")
     else:
