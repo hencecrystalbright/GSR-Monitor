@@ -10,7 +10,7 @@ st.set_page_config(
 
 st.markdown(
     "<h1>🪙 每日金銀市場與套利監測<br>"
-    "<span style='font-size: 0.55em; color: navy;'>Daily Gold & Silver Market and Monitor</span></h1>", 
+    "<span style='font-size: 0.55em; color: grey;'>Daily Gold & Silver Market and Monitor</span></h1>", 
     unsafe_allow_html=True
 )
 st.caption("數據來源：gold-api.com（現貨）＋ Frankfurter（DXY）＋ CoinGecko（RSI/5日波段）")
