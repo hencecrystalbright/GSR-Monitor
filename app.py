@@ -12,29 +12,29 @@ st.caption("數據來源：Yahoo Finance API (自動抓取) + GoldSilver.ai (手
 st.markdown("---")
 
 # 2. 定義自動抓取函數 (並設定快取避免過度頻繁請求)
-@st.cache_data(ttl=1800) # 30分鐘快取
+@st.cache_data(ttl=1200) # 20分鐘快取
 def fetch_market_data():
     try:
         # XAGUSD=X(現貨銀), XAUUSD=X(現貨金), SI=F(期銀), DX-Y.NYB(美元指數)
         tickers = ["XAGUSD=X", "XAUUSD=X", "SI=F", "DX-Y.NYB"]
         data = yf.download(tickers, period="1mo", progress=False)['Close']
         
-        # 【關鍵修正】：先向下填補(拿昨天的價格補今天)，再向上填補，絕不刪除整行資料
-        data = data.ffill().bfill()
-        
-        # 獲取最新一筆報價
-        latest = data.iloc[-1]
+        # 【終極修正】：不依賴整張表的最後一列，而是針對每個商品「獨立」抓取最後一個非空數值
+        spot_silver = data["XAGUSD=X"].dropna().iloc[-1]
+        spot_gold = data["XAUUSD=X"].dropna().iloc[-1]
+        comex_silver = data["SI=F"].dropna().iloc[-1]
+        dxy = data["DX-Y.NYB"].dropna().iloc[-1]
         
         # 歷史資料 (用於畫圖)
-        hist_spot_silver = data["XAGUSD=X"]
-        hist_gsr = data["XAUUSD=X"] / data["XAGUSD=X"]
+        hist_spot_silver = data["XAGUSD=X"].dropna()
+        hist_gsr = (data["XAUUSD=X"] / data["XAGUSD=X"]).dropna()
         
         return {
-            "spot_silver": round(latest["XAGUSD=X"], 2),
-            "spot_gold": round(latest["XAUUSD=X"], 2),
-            "comex_silver": round(latest["SI=F"], 2),
-            "dxy": round(latest["DX-Y.NYB"], 2),
-            "gsr": round(latest["XAUUSD=X"] / latest["XAGUSD=X"], 2),
+            "spot_silver": round(spot_silver, 2),
+            "spot_gold": round(spot_gold, 2),
+            "comex_silver": round(comex_silver, 2),
+            "dxy": round(dxy, 2),
+            "gsr": round(spot_gold / spot_silver, 2),
             "hist_spot_silver": hist_spot_silver,
             "hist_gsr": hist_gsr
         }
