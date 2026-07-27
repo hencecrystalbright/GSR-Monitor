@@ -326,11 +326,11 @@ if market_data:
     # GSR 判斷與推播
     current_alert = None
     if market_data["gsr"] >= gsr_upper:
-        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。"
+        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。「sell GOLD to buy SILVER」"
         st.error(msg)
         current_alert = "gsr_high"
     elif market_data["gsr"] <= gsr_lower:
-        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（<= {gsr_lower}）。白銀相對昂貴，建議專注「賣銀買金」。"
+        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（<= {gsr_lower}）。白銀相對昂貴，建議專注「賣銀買金」。「sell SILVER to buy GOLD」"
         st.warning(msg)
         current_alert = "gsr_low"
     else:
