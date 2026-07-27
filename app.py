@@ -295,7 +295,7 @@ if market_data:
     col5.metric("🇨🇳 上海銀溢價 Premium (手動/manual)", f"{st.session_state.sh_premium_val}%")
     col6.metric("📈 白銀 Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
 
-    st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 前往確認上海銀真實溢價To check the premium</a></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 搜尋銀真實溢價To check the premium</a></div>", unsafe_allow_html=True)
 
     st.markdown("---")
     
