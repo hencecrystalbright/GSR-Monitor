@@ -230,51 +230,43 @@ st.sidebar.markdown("<br>", unsafe_allow_html=True)
 premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5, key="premium_upper_val")
 premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5, key="premium_lower_val")
 
-# --- 側邊欄 Telegram 測試按鈕 ---
+# --- 側邊欄底部工具箱（緊湊整合版） ---
 st.sidebar.markdown("---")
-st.sidebar.header("📱 測試推播")
-if st.sidebar.button("📤 發送 Telegram 測試訊息"):
-    success = send_telegram_alert("🔔 *這是一則來自金銀戰情室的手動測試推播！* 🚀你的手機自觀看後10秒後自動銷毀")
-    if success:
-        st.sidebar.success("推播發送成功！請檢查手機。")
-    else:
-        st.sidebar.error("發送失敗，請檢查 Token 或 Chat ID。")
-# --- 側邊欄：Telegram Bot setup 教學 ---
-st.sidebar.markdown("---")
+st.sidebar.header("🛠️ 工具與個人戰術筆記")
+
+# 1. 測試推播 (改用 expander 保持外觀統一)
+with st.sidebar.expander("📱 Telegram 測試推播"):
+    if st.button("📤 發送測試訊息", use_container_width=True):
+        success = send_telegram_alert("🔔 *這是一則來自金銀戰情室的手動測試推播！* 🚀")
+        if success:
+            st.success("推播發送成功！請檢查手機。")
+        else:
+            st.error("發送失敗，請檢查 Token 或 Chat ID。")
+
+# 2. 設定教學 (緊貼上一個 expander)
 with st.sidebar.expander("📖 如何設定 Telegram 推播通知？"):
     st.markdown("""
     **1. 建立 Telegram 機器人**
-    * 在 Telegram 搜尋 `@BotFather`
-    * 發送 `/newbot` 指令
-    * 依提示設定 Bot 名稱與 Username
+    * 在 Telegram 搜尋 `@BotFather` 並發送 `/newbot`
     * 複製獲得的 **API Token**
     
-    **2. 取得您的 Chat ID**
-    * 在 Telegram 搜尋 `@userinfobot` 並發送 `/start`
-    * 複製回傳的 **Id** 數字
+    **2. 取得 Chat ID**
+    * 在 Telegram 搜尋 `@userinfobot` 發送 `/start` 取得 ID
     
-    **3. 啟用機器人對話**
-    * 搜尋您剛剛建立的 Bot Username
-    * 點擊下方 **`Start`** 或發送 `/start`（*重要！沒發送將無法收到推播*）
-    
-    **4. 綁定至程式碼**
-    * 將 Token 與 Chat ID填入 `send_telegram_alert()` 函數中即完成設定。
+    **3. 啟用機器人**
+    * 搜尋您的 Bot Username，點擊 **`Start`** (發送 `/start`)
     """)
-# --- 側邊欄：臨時交易筆記與教戰手則 ---
-st.sidebar.markdown("---")
-with st.sidebar.expander("📝 交易教戰手則 & 臨時筆記"):
+
+# 3. 交易筆記 (將 text_area 收入內部，保持邊界乾淨)
+with st.sidebar.expander("📝 教戰手則 & 臨時筆記"):
     st.markdown("**【個人核心交易紀律】**")
     st.caption("1. 達極端溢價時避開 COMEX 空單\n2. GSR 突破門檻分批套利\n3. 嚴格執行止損")
-    
     st.markdown("---")
-    st.markdown("**【本日盤中備忘 / 臨時筆記】**")
-    
-    # 建立帶有 key 記憶功能的文字輸入框
-    user_note = st.sidebar.text_area(
+    user_note = st.text_area(
         "輸入臨時心得（自動記憶）：",
-        height=150,
-        placeholder="例如：今日美盤開盤注意 CPI 數據；若溢價收斂至 10% 考慮平倉...",
-        key="trading_note_val"  # 👈 加上 key，確保輸入的文字不會因為刷網頁而消失
+        height=120,
+        placeholder="例如：美盤開盤注意 CPI 數據...",
+        key="trading_note_val"
     )
     
 # --- 執行抓取 ---
