@@ -201,7 +201,7 @@ def calc_fibonacci(current, past, high, low):
 
 if st.button("🔄 重新查詢", use_container_width=True):
     st.cache_data.clear()
-    st.rerun()
+    st.toast("已清除 API 快取並更新數據！", icon="✅")
 
 # --- 側邊欄設計 (直接綁定 st.session_state) ---
 st.sidebar.header("📌 上海銀溢價輸入區")
