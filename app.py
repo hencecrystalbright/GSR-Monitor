@@ -240,7 +240,7 @@ if st.sidebar.button("📤 發送 Telegram 測試訊息"):
     else:
         st.sidebar.error("發送失敗，請檢查 Token 或 Chat ID。")
         
-# --- 側邊欄：Telegram Bot 設定筆記教學 ---
+# --- 側邊欄：Telegram Bot setup 教學 ---
 st.sidebar.markdown("---")
 with st.sidebar.expander("📖 如何設定 Telegram 推播通知？"):
     st.markdown("""
