@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, date
+import calendar
 
 st.set_page_config(
     page_title="金銀市場與套利監測 (自動化版)", page_icon="🪙", layout="centered"
@@ -13,6 +14,41 @@ st.markdown("---")
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
+# --- 重大數據曆法推算模組 ---
+def get_next_nfp(current_date):
+    month, year = current_date.month, current_date.year
+    c = calendar.monthcalendar(year, month)
+    first_friday_day = c[0][4] if c[0][4] != 0 else c[1][4]
+    first_friday = date(year, month, first_friday_day)
+    
+    if current_date > first_friday:
+        month = 1 if month == 12 else month + 1
+        year = year + 1 if month == 1 else year
+        c = calendar.monthcalendar(year, month)
+        first_friday_day = c[0][4] if c[0][4] != 0 else c[1][4]
+        first_friday = date(year, month, first_friday_day)
+    return first_friday
+
+def get_next_cpi(current_date):
+    month, year = current_date.month, current_date.year
+    cpi_date = date(year, month, 13)
+    
+    if cpi_date.weekday() == 5: 
+        cpi_date = date(year, month, 12)
+    elif cpi_date.weekday() == 6: 
+        cpi_date = date(year, month, 14)
+        
+    if current_date > cpi_date:
+        month = 1 if month == 12 else month + 1
+        year = year + 1 if month == 1 else year
+        cpi_date = date(year, month, 13)
+        if cpi_date.weekday() == 5:
+            cpi_date = date(year, month, 12)
+        elif cpi_date.weekday() == 6:
+            cpi_date = date(year, month, 14)
+    return cpi_date
+
+# --- API 抓取模組 ---
 def fetch_metal_price(symbol):
     r = requests.get(f"https://api.gold-api.com/price/{symbol}", headers=HEADERS, timeout=10)
     r.raise_for_status()
@@ -151,13 +187,10 @@ st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 警示門檻微調")
 st.sidebar.caption("滑動以調整您的個人交易策略觸發點")
 
-# GSR 門檻滑桿
 gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", min_value=65.0, max_value=95.0, value=80.0, step=0.5)
 gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", min_value=40.0, max_value=65.0, value=50.0, step=0.5)
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
-
-# 溢價門檻滑桿
 premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5)
 premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5)
 
@@ -175,7 +208,7 @@ elif fetch_errors:
             st.code(e)
 
 if market_data:
-    st.caption(f"現貨資料時間：{market_data['as_of']} | 查詢時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.caption(f"查詢時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     st.markdown("### 📍 當日核心市場數據")
     col1, col2, col3 = st.columns(3)
@@ -230,8 +263,18 @@ if market_data:
     st.markdown("---")
     
     st.markdown("### 🚨 當日套利與轉置建議")
+    
+    today = datetime.now().date()
+    next_nfp = get_next_nfp(today)
+    next_cpi = get_next_cpi(today)
+    
+    # 【修改重點】在日期推斷下方加入提示文字
+    st.info(
+        f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n"
+        f"📅 **下次重大數據：** 非農 (NFP) `{next_nfp.strftime('%Y-%m-%d')}` ｜ CPI 預測 `{next_cpi.strftime('%Y-%m-%d')}`\n\n"
+        f"*(註：此日期為系統推斷，如遇美國假日或特殊情況，官方實際發布日可能提前或順延)*"
+    )
 
-    # 【更新】改用側邊欄變數進行邏輯判斷
     if market_data["gsr"] >= gsr_upper:
         st.error(f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。")
     elif market_data["gsr"] <= gsr_lower:
@@ -249,5 +292,5 @@ if market_data:
 st.divider()
 st.caption(
     "現貨金銀價由 gold-api.com 提供；DXY 為合成指數(-0.2)；白銀 RSI 與 5日波段由 CoinGecko 抓取實體代幣換算。"
-    "僅供研究參考，不構成投資建議。"
+    "重大事件日期為程式自動推算。僅供研究參考，不構成投資建議。"
 )
