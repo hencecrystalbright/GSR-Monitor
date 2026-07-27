@@ -350,13 +350,13 @@ if market_data:
 
     # 溢價判斷邏輯
     if st.session_state.sh_premium_val >= premium_upper:
-        msg_p = f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
+        msg_p = f"【溢價警示】上海銀溢價達 {st.session_state.sh_premium_val}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
         st.error(msg_p)
         send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg_p}")
     elif st.session_state.sh_premium_val <= premium_lower:
-        st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
+        st.success(f"【溢價狀態】上海銀溢價為 {st.session_state.sh_premium_val}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
     else:
-        st.warning(f"【溢價狀態】上海銀溢價為 {sh_premium}%，處於過渡區間，需求偏強但未達極端門檻。")
+        st.warning(f"【溢價狀態】上海銀溢價為 {st.session_state.sh_premium_val}%，處於過渡區間，需求偏強但未達極端門檻。")
 
 st.divider()
 st.caption(
