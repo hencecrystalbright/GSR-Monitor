@@ -5,7 +5,7 @@ from datetime import datetime, date
 import calendar
 
 st.set_page_config(
-    page_title="金銀市場與套利監測 (自動化版)", page_icon="🪙", layout="centered"
+    page_title="金銀市場與套利監測Daily Gold & Silver Market and Monitor (自動化版)", page_icon="🪙", layout="centered"
 )
 
 st.title("🪙 每日金銀市場與套利監測")
