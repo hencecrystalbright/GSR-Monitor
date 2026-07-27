@@ -117,7 +117,6 @@ def fetch_market_data():
         "as_of": silver_ts,
     }, errors
 
-# 【修正】精準的內部回撤與反彈壓力計算邏輯
 def calc_fibonacci(current, past, high, low):
     if any(v is None for v in [current, past, high, low]):
         return "資料不足", None
@@ -127,11 +126,9 @@ def calc_fibonacci(current, past, high, low):
         return "盤整 ➖", round(current, 2)
         
     if current > past:
-        # 上行趨勢：找回撤支撐 (從波段高點向下回撤 0.618)
         fib = high - (diff * 0.618)
         return "回撤支撐", round(fib, 2)
     elif current < past:
-        # 下行趨勢：找反彈壓力 (從波段低點向上反彈 0.618)
         fib = low + (diff * 0.618)
         return "反彈壓力", round(fib, 2)
     else:
@@ -141,6 +138,7 @@ if st.button("🔄 重新查詢", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
+# --- 側邊欄設計 ---
 st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
@@ -149,6 +147,22 @@ st.sidebar.markdown(
     "👉 **[點此查看 GoldSilver.ai 即時溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
 )
 
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ 警示門檻微調")
+st.sidebar.caption("滑動以調整您的個人交易策略觸發點")
+
+# GSR 門檻滑桿
+gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", min_value=65.0, max_value=95.0, value=80.0, step=0.5)
+gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", min_value=40.0, max_value=65.0, value=50.0, step=0.5)
+
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
+
+# 溢價門檻滑桿
+premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5)
+premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5)
+
+
+# --- 執行抓取 ---
 market_data, fetch_errors = fetch_market_data()
 
 if fetch_errors and market_data is None:
@@ -178,7 +192,6 @@ if market_data:
 
     st.markdown("---")
     
-    # 區塊 2：5日波段與費波納契支撐/壓力
     st.markdown("### 📐 5日波段 0.618 關鍵價位 (支撐/壓力)")
     st.caption("自動抓取近5日高低點。趨勢向上時提供「回撤防守支撐」，趨勢向下時提供「反彈解套壓力」。")
     
@@ -218,17 +231,18 @@ if market_data:
     
     st.markdown("### 🚨 當日套利與轉置建議")
 
-    if market_data["gsr"] >= 80:
-        st.error(f"【GSR 警示】金銀比達 {market_data['gsr']}（>=80）。白銀相對嚴重低估，建議考慮「賣金買銀」。")
-    elif market_data["gsr"] <= 50:
-        st.warning(f"【GSR 警示】金銀比達 {market_data['gsr']}（<=50）。白銀相對昂貴，建議「賣銀買金」。")
+    # 【更新】改用側邊欄變數進行邏輯判斷
+    if market_data["gsr"] >= gsr_upper:
+        st.error(f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。")
+    elif market_data["gsr"] <= gsr_lower:
+        st.warning(f"【GSR 警示】金銀比達 {market_data['gsr']}（<= {gsr_lower}）。白銀相對昂貴，建議「賣銀買金」。")
     else:
         st.info(f"【GSR 狀態】金銀比為 {market_data['gsr']}，目前位於中性區間。")
 
-    if sh_premium >= 20:
-        st.error(f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強，建議避開 COMEX 空單。")
-    elif sh_premium <= 10:
-        st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%。東西方定價收斂，無顯著跨市套利空間。")
+    if sh_premium >= premium_upper:
+        st.error(f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。")
+    elif sh_premium <= premium_lower:
+        st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
     else:
         st.warning(f"【溢價狀態】上海銀溢價為 {sh_premium}%，處於過渡區間，需求偏強但未達極端門檻。")
 
