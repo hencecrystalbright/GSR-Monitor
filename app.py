@@ -12,34 +12,36 @@ st.caption("數據來源：Yahoo Finance API (自動抓取) + GoldSilver.ai (手
 st.markdown("---")
 
 # 2. 定義自動抓取函數 (並設定快取避免過度頻繁請求)
-@st.cache_data(ttl=1200) # 20分鐘快取
+@st.cache_data(ttl=1800) # 30分鐘快取
 def fetch_market_data():
     try:
-        # XAGUSD=X(現貨銀), XAUUSD=X(現貨金), SI=F(期銀), DX-Y.NYB(美元指數)
-        tickers = ["XAGUSD=X", "XAUUSD=X", "SI=F", "DX-Y.NYB"]
-        data = yf.download(tickers, period="1mo", progress=False)['Close']
-        
-        # 【終極修正】：不依賴整張表的最後一列，而是針對每個商品「獨立」抓取最後一個非空數值
-        spot_silver = data["XAGUSD=X"].dropna().iloc[-1]
-        spot_gold = data["XAUUSD=X"].dropna().iloc[-1]
-        comex_silver = data["SI=F"].dropna().iloc[-1]
-        dxy = data["DX-Y.NYB"].dropna().iloc[-1]
-        
-        # 歷史資料 (用於畫圖)
-        hist_spot_silver = data["XAGUSD=X"].dropna()
-        hist_gsr = (data["XAUUSD=X"] / data["XAGUSD=X"]).dropna()
+        # 【終極防護】：放棄容易在雲端掉包的批次下載，改為逐一單獨抓取
+        def get_safe_data(ticker):
+            # 每次只專注抓取一個商品
+            df = yf.Ticker(ticker).history(period="1mo")
+            if df.empty or "Close" not in df:
+                raise ValueError(f"無法取得 {ticker} 的報價，可能遭逢假日或伺服器阻擋。")
+            # 確保只回傳乾淨的數值，過濾掉任何空洞
+            return df["Close"].dropna()
+            
+        # 依序抓取，確保穩定性
+        s_silver = get_safe_data("XAGUSD=X")
+        s_gold = get_safe_data("XAUUSD=X")
+        s_comex = get_safe_data("SI=F")
+        s_dxy = get_safe_data("DX-Y.NYB")
         
         return {
-            "spot_silver": round(spot_silver, 2),
-            "spot_gold": round(spot_gold, 2),
-            "comex_silver": round(comex_silver, 2),
-            "dxy": round(dxy, 2),
-            "gsr": round(spot_gold / spot_silver, 2),
-            "hist_spot_silver": hist_spot_silver,
-            "hist_gsr": hist_gsr
+            "spot_silver": round(s_silver.iloc[-1], 2),
+            "spot_gold": round(s_gold.iloc[-1], 2),
+            "comex_silver": round(s_comex.iloc[-1], 2),
+            "dxy": round(s_dxy.iloc[-1], 2),
+            "gsr": round(s_gold.iloc[-1] / s_silver.iloc[-1], 2),
+            "hist_spot_silver": s_silver,
+            "hist_gsr": (s_gold / s_silver).dropna()
         }
     except Exception as e:
-        st.error(f"連網抓取數據失敗，請稍後重試。錯誤訊息: {e}")
+        # 如果真的連線異常，把真實錯誤寫出來，不再讓它閃退
+        st.error(f"連網抓取數據失敗。錯誤細節: {e}")
         return None
 
 # 執行抓取
