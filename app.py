@@ -206,6 +206,9 @@ st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
 )
+st.sidebar.markdown(
+    "👉 **[點此查看 GoldSilver.ai 即時溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
+)
 
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 警示門檻微調")
