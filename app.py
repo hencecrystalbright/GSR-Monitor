@@ -82,30 +82,35 @@ def fetch_metal_price(symbol):
     data = r.json()
     return float(data["price"]), data.get("updatedAt")
 
+# --- 獨立對 DXY 加快取 (ttl=300秒)，避免頻繁刷新衝撞 API 導致 429 或查詢失敗 ---
+@st.cache_data(ttl=300)
 def fetch_synthetic_dxy():
-    r = requests.get(
-        "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,JPY,GBP,CAD,SEK,CHF",
-        headers=HEADERS,
-        timeout=10,
-    )
-    r.raise_for_status()
-    rates = r.json()["rates"]
-    eurusd = 1 / rates["EUR"]
-    usdjpy = rates["JPY"]
-    gbpusd = 1 / rates["GBP"]
-    usdcad = rates["CAD"]
-    usdsek = rates["SEK"]
-    usdchf = rates["CHF"]
-    dxy = (
-        50.14348112
-        * (eurusd ** -0.576)
-        * (usdjpy ** 0.136)
-        * (gbpusd ** -0.119)
-        * (usdcad ** 0.091)
-        * (usdsek ** 0.042)
-        * (usdchf ** 0.036)
-    ) - 0.2  
-    return dxy
+    try:
+        r = requests.get(
+            "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,JPY,GBP,CAD,SEK,CHF",
+            headers=HEADERS,
+            timeout=10,
+        )
+        r.raise_for_status()
+        rates = r.json()["rates"]
+        eurusd = 1 / rates["EUR"]
+        usdjpy = rates["JPY"]
+        gbpusd = 1 / rates["GBP"]
+        usdcad = rates["CAD"]
+        usdsek = rates["SEK"]
+        usdchf = rates["CHF"]
+        dxy = (
+            50.14348112
+            * (eurusd ** -0.576)
+            * (usdjpy ** 0.136)
+            * (gbpusd ** -0.119)
+            * (usdcad ** 0.091)
+            * (usdsek ** 0.042)
+            * (usdchf ** 0.036)
+        ) - 0.2  
+        return dxy
+    except Exception:
+        return None  # 若抓取失敗回傳 NA，由主程式呈現防護提示
 
 def fetch_crypto_history(coin_id, days):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
