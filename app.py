@@ -36,7 +36,7 @@ def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# 👈 callback推薦放在這裡！
+# 👈 callback推薦放在這裡save_data之下！
 def update_premium_cb():
     data = load_data()
     data["sh_premium"] = st.session_state.sh_premium_val
