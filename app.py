@@ -66,13 +66,14 @@ BOT_TOKEN = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU"
 ALLOWED_CHAT_ID = "5259644398"
 
 async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id) != ALLOWED_CHAT_ID: return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): 
+        return
     await update.message.reply_text(
         "🪙 *金銀戰情室控制台已連線！*\n\n"
         "指令列表：\n"
-        "1. `/p 12.35` (或 `/p 12.35%`)：更新溢價\n"
-        "2. `/note 內容`：更新筆記\n"
-        "3. `/get`：查詢當前設定",
+        "1. `/p 12.35` ：更新溢價\n"
+        "2. `/note 內容` ：更新筆記\n"
+        "3. `/get` ：查詢當前設定",
         parse_mode="Markdown"
     )
 
@@ -125,9 +126,11 @@ def run_bot_thread():
     bot_app.add_handler(CommandHandler("get", tg_get_status))
     bot_app.run_polling(drop_pending_updates=True)
 
-# 啟動背景執行緒（全域只啟動一次）
-if "bot_started" not in st.session_state:
-    st.session_state.bot_started = True
+# 啟動背景執行緒（使用 Python 全域變數，確保伺服器生命週期內 100% 只會啟動一次）
+_BOT_STARTED = False
+
+if not _BOT_STARTED:
+    _BOT_STARTED = True
     threading.Thread(target=run_bot_thread, daemon=True).start()
     
 # --- Telegram 推播函數 ---
