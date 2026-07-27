@@ -20,14 +20,13 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 # --- Telegram 推播函數 ---
 def send_telegram_alert(message):
-    bot_token = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU"
+    bot_token = "885051159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU" 
     chat_id = "5259644398"
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
+        "text": message
+            }
     try:
         r = requests.post(url, json=payload, timeout=5)
         return r.status_code == 200
