@@ -239,7 +239,6 @@ if st.sidebar.button("📤 發送 Telegram 測試訊息"):
         st.sidebar.success("推播發送成功！請檢查手機。")
     else:
         st.sidebar.error("發送失敗，請檢查 Token 或 Chat ID。")
-        
 # --- 側邊欄：Telegram Bot setup 教學 ---
 st.sidebar.markdown("---")
 with st.sidebar.expander("📖 如何設定 Telegram 推播通知？"):
@@ -261,7 +260,6 @@ with st.sidebar.expander("📖 如何設定 Telegram 推播通知？"):
     **4. 綁定至程式碼**
     * 將 Token 與 Chat ID填入 `send_telegram_alert()` 函數中即完成設定。
     """)
-
 # --- 側邊欄：臨時交易筆記與教戰手則 ---
 st.sidebar.markdown("---")
 with st.sidebar.expander("📝 交易教戰手則 & 臨時筆記"):
