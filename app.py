@@ -292,8 +292,9 @@ if market_data:
 
     col4, col5, col6 = st.columns(3)
     col4.metric("⚖️ 金銀比 (GSR)", f"{market_data['gsr']}")
-    col5.metric("🇨🇳 上海銀溢價 Premium (手動/manual)", f"{st.session_state.sh_premium_val}%")
-    col6.metric("📈 白銀 Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
+    col5.metric("📈 白銀 Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
+    col6.metric("🇨🇳 上海銀溢價 Premium (手動/manual)", f"{st.session_state.sh_premium_val}%")
+
 
     st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 搜尋銀真實溢價To check the premium</a></div>", unsafe_allow_html=True)
 
