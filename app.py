@@ -247,7 +247,7 @@ st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 Premium (%)", step=0.1, 
     help="請輸入今日最新的真實溢價數據",
-    key="sh_premium_val"
+    key="sh_premium_val",
     on_change=update_premium_cb
 )
 st.sidebar.markdown(
@@ -301,7 +301,7 @@ with st.sidebar.expander("📝 教戰手則 & 臨時筆記"):
         "輸入臨時心得（自動記憶）：",
         height=120,
         placeholder="例如：美盤開盤注意 CPI 數據...",
-        key="trading_note_val"
+        key="trading_note_val",
         on_change=update_note_cb
     )
     
