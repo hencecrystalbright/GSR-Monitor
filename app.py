@@ -244,7 +244,7 @@ with st.sidebar.expander("📱 Telegram 測試推播"):
             st.error("發送失敗，請檢查 Token 或 Chat ID。")
 
 # 2. 設定教學 (緊貼上一個 expander)
-with st.sidebar.expander("📖 如何設定 Telegram 推播通知？"):
+with st.sidebar.expander("📖 Setup Telegram 設定？"):
     st.markdown("""
     **1. 建立 Telegram 機器人**
     * 在 Telegram 搜尋 `@BotFather` 並發送 `/newbot`
