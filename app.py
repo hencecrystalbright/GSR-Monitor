@@ -201,10 +201,12 @@ if st.button("🔄 重新查詢", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
-# --- 側邊欄設計（使用 key 自動幫您管理 session_state） ---
+# --- 側邊欄設計 (加入 key 記憶溢價數值) ---
 st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
-    "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
+    "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, 
+    help="請輸入今日最新的真實溢價數據",
+    key="sh_premium_val"  # 👈 加上這行，自動記憶您輸入的數值
 )
 st.sidebar.markdown(
     "👉 **[ Ai即時溢價premium](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
