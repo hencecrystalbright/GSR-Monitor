@@ -29,9 +29,10 @@ def send_telegram_alert(message):
         "parse_mode": "Markdown"
     }
     try:
-        requests.post(url, json=payload, timeout=5)
+        r = requests.post(url, json=payload, timeout=5)
+        return r.status_code == 200
     except Exception:
-        pass
+        return False
 
 # --- 重大數據曆法推算模組 ---
 def get_next_nfp(current_date):
@@ -144,16 +145,18 @@ def fetch_market_data():
             silver_past = recent_5d[0]
             silver_high = max(recent_5d)
             silver_low = min(recent_5d)
-            
+    except Exception as e:
+        errors.append(f"CoinGecko 白銀歷史抓取失敗 (可能觸發429限流)：{e}")
+
+    try:
         au_hist = fetch_crypto_history("pax-gold", 6)
         if au_hist and len(au_hist) > 0:
             recent_5d = [p[1] for p in au_hist]
             gold_past = recent_5d[0]
             gold_high = max(recent_5d)
             gold_low = min(recent_5d)
-            
     except Exception as e:
-        errors.append(f"CoinGecko 歷史數據抓取失敗：{e}")
+        errors.append(f"CoinGecko 黃金歷史抓取失敗 (可能觸發429限流)：{e}")
 
     gsr = round(gold_spot / silver_spot, 2) if silver_spot else None
 
@@ -174,7 +177,7 @@ def fetch_market_data():
 
 def calc_fibonacci(current, past, high, low):
     if any(v is None for v in [current, past, high, low]):
-        return "資料不足", None
+        return "資料不足 (限流保護中)", None
     
     diff = high - low
     if diff == 0:
@@ -213,6 +216,16 @@ st.sidebar.markdown("<br>", unsafe_allow_html=True)
 premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5)
 premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5)
 
+# --- 新增：側邊欄 Telegram 測試按鈕 ---
+st.sidebar.markdown("---")
+st.sidebar.header("📱 測試推播")
+if st.sidebar.button("📤 發送 Telegram 測試訊息"):
+    success = send_telegram_alert("🔔 *這是一則來自金銀戰情室的手動測試推播！* 🚀")
+    if success:
+        st.sidebar.success("推播發送成功！請檢查手機。")
+    else:
+        st.sidebar.error("發送失敗，請檢查 Token 或 Chat ID。")
+
 
 # --- 執行抓取 ---
 market_data, fetch_errors = fetch_market_data()
@@ -222,7 +235,7 @@ if fetch_errors and market_data is None:
     for e in fetch_errors:
         st.code(e)
 elif fetch_errors:
-    with st.expander("⚠️ 部分數據抓取異常，點此查看細節"):
+    with st.expander("⚠️ 部分數據抓取異常 (可能因短時間重新整理過多觸發 CoinGecko 429 限制)"):
         for e in fetch_errors:
             st.code(e)
 
@@ -262,7 +275,7 @@ if market_data:
             elif "壓力" in ag_type:
                 st.error(f"🛑 0.618 反彈壓力: **${ag_fib}**")
         else:
-            st.warning("缺乏歷史數據")
+            st.warning("缺乏歷史數據 (等待 CoinGecko 解除 429 限制)")
 
     with fib_col2:
         st.markdown("**【黃金 XAU】**")
@@ -277,7 +290,7 @@ if market_data:
             elif "壓力" in au_type:
                 st.error(f"🛑 0.618 反彈壓力: **${au_fib}**")
         else:
-            st.warning("缺乏歷史數據")
+            st.warning("缺乏歷史數據 (等待 CoinGecko 解除 429 限制)")
 
     st.markdown("---")
     
@@ -293,31 +306,21 @@ if market_data:
         f"*(註：此日期為系統推斷，如遇美國假日或特殊情況，官方實際發布日可能提前或順延)*"
     )
 
-    # 初始化推播記錄防護
-    if "alert_sent" not in st.session_state:
-        st.session_state.alert_sent = False
-
     if market_data["gsr"] >= gsr_upper:
         msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。"
         st.error(msg)
-        if not st.session_state.alert_sent:
-            send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
-            st.session_state.alert_sent = True
+        send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
     elif market_data["gsr"] <= gsr_lower:
-        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（<= {gsr_lower}）。白銀相對昂貴，建議「賣銀買金」。"
+        msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（<= {gsr_lower}）。白銀相對昂貴，建議專注「賣銀買金」。"
         st.warning(msg)
-        if not st.session_state.alert_sent:
-            send_telegram_alert(f"⚠️ *戰情室快訊* ⚠️\n\n{msg}")
-            st.session_state.alert_sent = True
+        send_telegram_alert(f"⚠️ *戰情室快訊* ⚠️\n\n{msg}")
     else:
         st.info(f"【GSR 狀態】金銀比為 {market_data['gsr']}，目前位於中性區間。")
 
     if sh_premium >= premium_upper:
         msg = f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
         st.error(msg)
-        if not st.session_state.alert_sent:
-            send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
-            st.session_state.alert_sent = True
+        send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
     elif sh_premium <= premium_lower:
         st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
     else:
