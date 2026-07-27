@@ -201,25 +201,33 @@ if st.button("🔄 重新查詢", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
-# --- 側邊欄設計 ---
+# --- 側邊欄設計（加入 session_state 記憶滑桿數值） ---
 st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
-)
-st.sidebar.markdown(
-    "👉 **[點此查看 GoldSilver.ai 即時溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
 )
 
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 警示門檻微調")
 st.sidebar.caption("滑動以調整您的個人交易策略觸發點")
 
-gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", min_value=65.0, max_value=95.0, value=80.0, step=0.5)
-gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", min_value=40.0, max_value=65.0, value=50.0, step=0.5)
+# 初始化記憶體預設值
+if "gsr_upper_val" not in st.session_state:
+    st.session_state.gsr_upper_val = 80.0
+if "gsr_lower_val" not in st.session_state:
+    st.session_state.gsr_lower_val = 50.0
+if "premium_upper_val" not in st.session_state:
+    st.session_state.premium_upper_val = 20.0
+if "premium_lower_val" not in st.session_state:
+    st.session_state.premium_lower_val = 10.0
+
+# 建立具有記憶功能的滑桿
+gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", min_value=65.0, max_value=95.0, value=st.session_state.gsr_upper_val, step=0.5)
+gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", min_value=40.0, max_value=65.0, value=st.session_state.gsr_lower_val, step=0.5)
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
-premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5)
-premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5)
+premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=st.session_state.premium_upper_val, step=0.5)
+premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=st.session_state.premium_lower_val, step=0.5)
 
 # --- 新增：側邊欄 Telegram 測試按鈕 ---
 st.sidebar.markdown("---")
@@ -311,21 +319,45 @@ if market_data:
         f"*(註：此日期為系統推斷，如遇美國假日或特殊情況，官方實際發布日可能提前或順延)*"
     )
 
+   # --- 智慧防護與推播觸發機制 ---
+    if "last_gsr_upper" not in st.session_state:
+        st.session_state.last_gsr_upper = gsr_upper
+    if "last_gsr_lower" not in st.session_state:
+        st.session_state.last_gsr_lower = gsr_lower
+    if "alert_sent_state" not in st.session_state:
+        st.session_state.alert_sent_state = None  # 記錄上一次發送的是哪一種警報
+
+    # 檢查：如果使用者手動調整了滑桿門檻，自動重置發送鎖定，允許再次報警！
+    if gsr_upper != st.session_state.last_gsr_upper or gsr_lower != st.session_state.last_gsr_lower:
+        st.session_state.alert_sent_state = None
+        st.session_state.last_gsr_upper = gsr_upper
+        st.session_state.last_gsr_lower = gsr_lower
+
+    # GSR 判斷與推播
+    current_alert = None
     if market_data["gsr"] >= gsr_upper:
         msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。"
         st.error(msg)
-        send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
+        current_alert = "gsr_high"
     elif market_data["gsr"] <= gsr_lower:
         msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（<= {gsr_lower}）。白銀相對昂貴，建議專注「賣銀買金」。"
         st.warning(msg)
-        send_telegram_alert(f"⚠️ *戰情室快訊* ⚠️\n\n{msg}")
+        current_alert = "gsr_low"
     else:
         st.info(f"【GSR 狀態】金銀比為 {market_data['gsr']}，目前位於中性區間。")
+        current_alert = "neutral"
 
+    # 只有當「狀態改變」或是「剛好跨越門檻」時，才會發送一次 Telegram 推播，避免干擾
+    if current_alert != st.session_state.alert_sent_state:
+        if current_alert in ["gsr_high", "gsr_low"]:
+            send_telegram_alert(f"🚨 *戰情室即時快訊* 🚨\n\n{msg}")
+        st.session_state.alert_sent_state = current_alert
+
+    # 溢價判斷邏輯
     if sh_premium >= premium_upper:
-        msg = f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
-        st.error(msg)
-        send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg}")
+        msg_p = f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
+        st.error(msg_p)
+        send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg_p}")
     elif sh_premium <= premium_lower:
         st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
     else:
