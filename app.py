@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import requests
 
 # 1. 頁面標題與配置
 st.set_page_config(
@@ -16,19 +15,21 @@ st.markdown("---")
 @st.cache_data(ttl=1800) # 30分鐘快取
 def fetch_market_data():
     try:
-        # 【破解機制】：建立一個帶有真實瀏覽器特徵的連線 Session，騙過 Yahoo 防火牆
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        })
-        
         def get_safe_data(ticker_symbol):
-            # 將偽裝的 session 傳入 yfinance
-            ticker = yf.Ticker(ticker_symbol, session=session)
+            # 讓最新版的 yfinance 自己處理防擋與通行證機制
+            ticker = yf.Ticker(ticker_symbol)
             df = ticker.history(period="1mo")
+            
             if df.empty or "Close" not in df:
-                raise ValueError(f"無法取得 {ticker_symbol} 的報價，可能遭逢假日或伺服器阻擋。")
-            return df["Close"].dropna()
+                raise ValueError(f"Yahoo 拒絕提供 {ticker_symbol} 報價。")
+            
+            clean_series = df["Close"].dropna()
+            
+            # 【終極防呆】：如果清除空值後沒資料了，絕對不執行 iloc 導致崩潰
+            if len(clean_series) == 0:
+                raise ValueError(f"{ticker_symbol} 缺乏有效歷史資料。")
+                
+            return clean_series
             
         # 依序抓取
         s_silver = get_safe_data("XAGUSD=X")
@@ -46,7 +47,8 @@ def fetch_market_data():
             "hist_gsr": (s_gold / s_silver).dropna()
         }
     except Exception as e:
-        st.error(f"連網抓取數據失敗。錯誤細節: {e}")
+        # 溫和報錯，不讓整個 App 崩潰
+        st.error(f"⚠️ 連網抓取數據失敗，這通常是 Yahoo 暫時封鎖雲端 IP，或逢週末無資料。\n請稍後重新整理網頁。系統回報細節: {e}")
         return None
 
 # 執行抓取
@@ -55,7 +57,6 @@ market_data = fetch_market_data()
 # 3. 側邊欄：唯一的手動輸入區
 st.sidebar.header("📌 上海銀溢價輸入區")
 
-# 輸入框
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 (%)",
     value=12.22,
@@ -63,7 +64,6 @@ sh_premium = st.sidebar.number_input(
     help="請輸入今日最新的真實溢價數據"
 )
 
-# 放置於輸入框正下方的醒目連結
 st.sidebar.markdown("👉 **[點此查看 GoldSilver.ai 即時溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)**")
 
 # 4. 主畫面：數據展示與邏輯判斷
@@ -79,7 +79,6 @@ if market_data:
     col4.metric("金銀比 (GSR)", f"{market_data['gsr']}")
     col5.metric("上海銀溢價 (手動)", f"{sh_premium}%")
     
-    # 主畫面板塊右下角快捷連結
     st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 前往確認上海銀真實溢價</a></div>", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -87,7 +86,6 @@ if market_data:
     # 5. 邏輯判斷與套利建議
     st.markdown("### 🚨 當日套利與轉置建議")
     
-    # GSR 轉置邏輯
     if market_data['gsr'] >= 80:
         st.error(f"【GSR 警示】金銀比達 {market_data['gsr']} (>=80)。白銀相對嚴重低估，建議考慮「賣金買銀」。")
     elif market_data['gsr'] <= 50:
@@ -95,7 +93,6 @@ if market_data:
     else:
         st.info(f"【GSR 狀態】金銀比為 {market_data['gsr']}，目前位於中性區間。")
 
-    # 上海銀溢價套利邏輯
     if sh_premium >= 20:
         st.error(f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強，建議避開 COMEX 空單。")
     elif sh_premium <= 10:
