@@ -329,9 +329,9 @@ if market_data:
             )
             st.metric(f"5日區間: ${round(market_data['gold_low'], 2)} - ${round(market_data['gold_high'], 2)}", f"型態: {au_type}")
             if "支撐" in au_type:
-                st.info(f"🛡️ 0.618 防守支撐: **${ag_fib}**")
+                st.info(f"🛡️ 0.618 防守支撐: **${au_fib}**")
             elif "壓力" in au_type:
-                st.error(f"🛑 0.618 反彈壓力: **${ag_fib}**")
+                st.error(f"🛑 0.618 反彈壓力: **${au_fib}**")
         else:
             st.warning("缺乏歷史數據 (等待 CoinGecko 解除 429 限制)")
 
