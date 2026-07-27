@@ -18,6 +18,10 @@ st.markdown("---")
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
+# --- 1. 初始化 Session State 記憶體防護 (解決重新整理與重新查詢重置問題) ---
+if "sh_premium_val" not in st.session_state:
+    st.session_state.sh_premium_val = 12.22
+
 # --- Telegram 推播函數 ---
 def send_telegram_alert(message):
     bot_token = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU"
@@ -28,9 +32,7 @@ def send_telegram_alert(message):
         "text": message
     }
     try:
-        # 把逾時時間從 5 秒拉長到 10 秒，避免雲端伺服器太慢
         r = requests.post(url, json=payload, timeout=10)
-        # 如果失敗，把 Telegram 回傳的錯誤訊息印出來
         if r.status_code != 200:
             st.sidebar.error(f"Telegram API 錯誤: {r.text}")
             return False
@@ -201,10 +203,10 @@ if st.button("🔄 重新查詢", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
-# --- 側邊欄設計 (加入 key 記憶溢價數值) ---
+# --- 側邊欄設計 (直接綁定 st.session_state) ---
 st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
-    "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, 
+    "今日上海銀溢價 Premium (%)", step=0.1, 
     help="請輸入今日最新的真實溢價數據",
     key="sh_premium_val"
 )
@@ -216,7 +218,6 @@ st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 警示門檻微調")
 st.sidebar.caption("滑動以調整您的個人交易策略觸發點")
 
-# 透過 key=... 讓 Streamlit 自動幫您把數值記在 session_state 裡，不用手動寫一堆 if
 gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", min_value=65.0, max_value=95.0, value=80.0, step=0.5, key="gsr_upper_val")
 gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", min_value=40.0, max_value=65.0, value=50.0, step=0.5, key="gsr_lower_val")
 
@@ -224,7 +225,7 @@ st.sidebar.markdown("<br>", unsafe_allow_html=True)
 premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5, key="premium_upper_val")
 premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5, key="premium_lower_val")
 
-# --- 新增：側邊欄 Telegram 測試按鈕 ---
+# --- 側邊欄 Telegram 測試按鈕 ---
 st.sidebar.markdown("---")
 st.sidebar.header("📱 測試推播")
 if st.sidebar.button("📤 發送 Telegram 測試訊息"):
@@ -233,7 +234,6 @@ if st.sidebar.button("📤 發送 Telegram 測試訊息"):
         st.sidebar.success("推播發送成功！請檢查手機。")
     else:
         st.sidebar.error("發送失敗，請檢查 Token 或 Chat ID。")
-
 
 # --- 執行抓取 ---
 market_data, fetch_errors = fetch_market_data()
@@ -294,9 +294,9 @@ if market_data:
             )
             st.metric(f"5日區間: ${round(market_data['gold_low'], 2)} - ${round(market_data['gold_high'], 2)}", f"型態: {au_type}")
             if "支撐" in au_type:
-                st.info(f"🛡️ 0.618 防守支撐: **${au_fib}**")
+                st.info(f"🛡️ 0.618 防守支撐: **${ag_fib}**")
             elif "壓力" in au_type:
-                st.error(f"🛑 0.618 反彈壓力: **${au_fib}**")
+                st.error(f"🛑 0.618 反彈壓力: **${ag_fib}**")
         else:
             st.warning("缺乏歷史數據 (等待 CoinGecko 解除 429 限制)")
 
@@ -314,7 +314,7 @@ if market_data:
         f"*(註：此日期為系統推斷，如遇美國假日或特殊情況，官方實際發布日可能提前或順延)*"
     )
 
-   # --- 智慧防護與推播觸發機制 ---
+    # --- 智慧防護與推播觸發機制 ---
     if "last_gsr_upper" not in st.session_state:
         st.session_state.last_gsr_upper = gsr_upper
     if "last_gsr_lower" not in st.session_state:
