@@ -177,7 +177,7 @@ if st.button("🔄 重新查詢", use_container_width=True):
 # --- 側邊欄設計 ---
 st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
-    "今日上海銀溢價 (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
+    "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
 )
 st.sidebar.markdown(
     "👉 **[點此查看 GoldSilver.ai 即時溢價](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
@@ -212,14 +212,14 @@ if market_data:
     
     st.markdown("### 📍 當日核心市場數據")
     col1, col2, col3 = st.columns(3)
-    col1.metric("現貨銀價Silver (Spot)", f"${market_data['spot_silver']}")
-    col2.metric("現貨金價GOLD (Spot)", f"${market_data['spot_gold']}")
-    col3.metric("合成 DXY (校正)", market_data["dxy"] if market_data["dxy"] is not None else "查詢失敗")
+    col1.metric("🥈 現貨銀價 Silver (Spot)", f"${market_data['spot_silver']}")
+    col2.metric("🥇 現貨金價 GOLD (Spot)", f"${market_data['spot_gold']}")
+    col3.metric("💵 合成 DXY (校正)", market_data["dxy"] if market_data["dxy"] is not None else "查詢失敗")
 
     col4, col5, col6 = st.columns(3)
-    col4.metric("金銀比 (GSR)", f"{market_data['gsr']}")
-    col5.metric("上海銀溢價premium (手動)", f"{sh_premium}%")
-    col6.metric("白銀Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
+    col4.metric("⚖️ 金銀比 (GSR)", f"{market_data['gsr']}")
+    col5.metric("🇨🇳 上海銀溢價 Premium (手動)", f"{sh_premium}%")
+    col6.metric("📈 白銀 Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
 
     st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 前往確認上海銀真實溢價</a></div>", unsafe_allow_html=True)
 
@@ -268,7 +268,6 @@ if market_data:
     next_nfp = get_next_nfp(today)
     next_cpi = get_next_cpi(today)
     
-    # 【修改重點】在日期推斷下方加入提示文字
     st.info(
         f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n"
         f"📅 **下次重大數據：** 非農 (NFP) `{next_nfp.strftime('%Y-%m-%d')}` ｜ CPI 預測 `{next_cpi.strftime('%Y-%m-%d')}`\n\n"
