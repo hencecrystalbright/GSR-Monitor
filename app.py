@@ -261,6 +261,23 @@ with st.sidebar.expander("📖 如何設定 Telegram 推播通知？"):
     **4. 綁定至程式碼**
     * 將 Token 與 Chat ID填入 `send_telegram_alert()` 函數中即完成設定。
     """)
+
+# --- 側邊欄：臨時交易筆記與教戰手則 ---
+st.sidebar.markdown("---")
+with st.sidebar.expander("📝 交易教戰手則 & 臨時筆記"):
+    st.markdown("**【個人核心交易紀律】**")
+    st.caption("1. 達極端溢價時避開 COMEX 空單\n2. GSR 突破門檻分批套利\n3. 嚴格執行止損")
+    
+    st.markdown("---")
+    st.markdown("**【本日盤中備忘 / 臨時筆記】**")
+    
+    # 建立帶有 key 記憶功能的文字輸入框
+    user_note = st.sidebar.text_area(
+        "輸入臨時心得（自動記憶）：",
+        height=150,
+        placeholder="例如：今日美盤開盤注意 CPI 數據；若溢價收斂至 10% 考慮平倉...",
+        key="trading_note_val"  # 👈 加上 key，確保輸入的文字不會因為刷網頁而消失
+    )
     
 # --- 執行抓取 ---
 market_data, fetch_errors = fetch_market_data()
