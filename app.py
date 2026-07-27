@@ -207,7 +207,7 @@ sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
 )
 st.sidebar.markdown(
-    "👉 **[ 即時溢價premiun](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
+    "👉 **[ Ai即時溢價premium](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
 )
 
 st.sidebar.markdown("---")
