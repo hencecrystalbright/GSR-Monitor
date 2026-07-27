@@ -212,14 +212,14 @@ if market_data:
     
     st.markdown("### 📍 當日核心市場數據")
     col1, col2, col3 = st.columns(3)
-    col1.metric("現貨銀價 (Spot)", f"${market_data['spot_silver']}")
-    col2.metric("現貨金價 (Spot)", f"${market_data['spot_gold']}")
+    col1.metric("現貨銀價Silver (Spot)", f"${market_data['spot_silver']}")
+    col2.metric("現貨金價GOLD (Spot)", f"${market_data['spot_gold']}")
     col3.metric("合成 DXY (校正)", market_data["dxy"] if market_data["dxy"] is not None else "查詢失敗")
 
     col4, col5, col6 = st.columns(3)
     col4.metric("金銀比 (GSR)", f"{market_data['gsr']}")
-    col5.metric("上海銀溢價 (手動)", f"{sh_premium}%")
-    col6.metric("白銀 RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
+    col5.metric("上海銀溢價premium (手動)", f"{sh_premium}%")
+    col6.metric("白銀Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
 
     st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 前往確認上海銀真實溢價</a></div>", unsafe_allow_html=True)
 
