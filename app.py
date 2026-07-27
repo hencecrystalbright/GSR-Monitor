@@ -258,7 +258,7 @@ if market_data:
 
     col4, col5, col6 = st.columns(3)
     col4.metric("⚖️ 金銀比 (GSR)", f"{market_data['gsr']}")
-    col5.metric("🇨🇳 上海銀溢價 Premium (手動/manual)", f"{sh_premium}%")
+    col5.metric("🇨🇳 上海銀溢價 Premium (手動/manual)", f"{st.session_state.sh_premium_val}%")
     col6.metric("📈 白銀 Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
 
     st.markdown("<div style='text-align: right;'><a href='https://goldsilver.ai/metal-prices/shanghai-silver-price' target='_blank'>🔗 前往確認上海銀真實溢價To check the premium</a></div>", unsafe_allow_html=True)
@@ -349,11 +349,11 @@ if market_data:
         st.session_state.alert_sent_state = current_alert
 
     # 溢價判斷邏輯
-    if sh_premium >= premium_upper:
+    if st.session_state.sh_premium_val >= premium_upper:
         msg_p = f"【溢價警示】上海銀溢價達 {sh_premium}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
         st.error(msg_p)
         send_telegram_alert(f"🚨 *戰情室快訊* 🚨\n\n{msg_p}")
-    elif sh_premium <= premium_lower:
+    elif st.session_state.sh_premium_val <= premium_lower:
         st.success(f"【溢價狀態】上海銀溢價為 {sh_premium}%（<= {premium_lower}%）。東西方定價收斂，無顯著跨市套利空間。")
     else:
         st.warning(f"【溢價狀態】上海銀溢價為 {sh_premium}%，處於過渡區間，需求偏強但未達極端門檻。")
