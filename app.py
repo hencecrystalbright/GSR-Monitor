@@ -201,7 +201,7 @@ if st.button("🔄 重新查詢", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
-# --- 側邊欄設計（加入 session_state 記憶滑桿數值） ---
+# --- 側邊欄設計（使用 key 自動幫您管理 session_state） ---
 st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 Premium (%)", value=12.22, step=0.1, help="請輸入今日最新的真實溢價數據"
@@ -211,23 +211,13 @@ st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 警示門檻微調")
 st.sidebar.caption("滑動以調整您的個人交易策略觸發點")
 
-# 初始化記憶體預設值
-if "gsr_upper_val" not in st.session_state:
-    st.session_state.gsr_upper_val = 80.0
-if "gsr_lower_val" not in st.session_state:
-    st.session_state.gsr_lower_val = 50.0
-if "premium_upper_val" not in st.session_state:
-    st.session_state.premium_upper_val = 20.0
-if "premium_lower_val" not in st.session_state:
-    st.session_state.premium_lower_val = 10.0
-
-# 建立具有記憶功能的滑桿
-gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", min_value=65.0, max_value=95.0, value=st.session_state.gsr_upper_val, step=0.5)
-gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", min_value=40.0, max_value=65.0, value=st.session_state.gsr_lower_val, step=0.5)
+# 透過 key=... 讓 Streamlit 自動幫您把數值記在 session_state 裡，不用手動寫一堆 if
+gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", min_value=65.0, max_value=95.0, value=80.0, step=0.5, key="gsr_upper_val")
+gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", min_value=40.0, max_value=65.0, value=50.0, step=0.5, key="gsr_lower_val")
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
-premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=st.session_state.premium_upper_val, step=0.5)
-premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=st.session_state.premium_lower_val, step=0.5)
+premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5, key="premium_upper_val")
+premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5, key="premium_lower_val")
 
 # --- 新增：側邊欄 Telegram 測試按鈕 ---
 st.sidebar.markdown("---")
