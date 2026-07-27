@@ -36,6 +36,17 @@ def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+# 👈 callback推薦放在這裡！
+def update_premium_cb():
+    data = load_data()
+    data["sh_premium"] = st.session_state.sh_premium_val
+    save_data(data)
+
+def update_note_cb():
+    data = load_data()
+    data["trading_note"] = st.session_state.trading_note_val
+    save_data(data)
+
 # 初始化載入 JSON 資料
 saved_data = load_data()
 
