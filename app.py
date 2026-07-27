@@ -13,7 +13,7 @@ st.markdown(
     "<span style='font-size: 0.55em; color: grey;'>Daily Gold & Silver Market and Monitor</span></h1>", 
     unsafe_allow_html=True
 )
-st.caption("數據來源：gold-api.com（現貨）＋ Frankfurter（DXY）＋ CoinGecko（RSI/5日波段）")
+st.caption("數據來源：gold-api.com（現貨）10/m＋ Frankfurter（DXY）1/3m＋ CoinGecko（RSI/5日波段）1/10m")
 st.markdown("---")
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
