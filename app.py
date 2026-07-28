@@ -112,18 +112,25 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     try:
         from deep_translator import GoogleTranslator
+        import re  # 匯入正則表達式模組，用來偵測文字特徵
         
-        # 嘗試翻譯，若被 Google 阻擋則回傳提示
+        # 💡 智慧語系偵測：解決 Google 翻譯對「超短中文」判斷失效的 Bug
+        # 只要字串裡包含任何一個中文字 (Unicode 範圍)，就強制指定來源為中文
+        if re.search(r'[\u4e00-\u9fa5]', text):
+            src_lang = 'zh-TW'
+        else:
+            src_lang = 'auto'
+            
         try:
-            trans_zh = GoogleTranslator(source='auto', target='zh-TW').translate(text)
-            trans_en = GoogleTranslator(source='auto', target='en').translate(text)
-            trans_vi = GoogleTranslator(source='auto', target='vi').translate(text)
+            # 使用我們判定好的 src_lang 來取代原本的 'auto'
+            trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(text)
+            trans_en = GoogleTranslator(source=src_lang, target='en').translate(text)
+            trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(text)
             final_note = f"【原文】{text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
         except Exception as e:
-            # 翻譯失敗時的備用方案 (只存原文)
-            final_note = f"【原文】{text}\n(⚠️ Google 翻譯 API 暫時阻擋，僅儲存原文)"
+            final_note = f"【原文】{text}\n(⚠️ 翻譯 API 暫時阻擋，僅儲存原文)"
         
-        # 2. 僅讀寫 JSON，絕對不碰 st.session_state
+        # 存檔並回傳
         data = load_data()
         data["trading_note"] = final_note
         save_data(data)
