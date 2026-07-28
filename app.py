@@ -152,6 +152,7 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     
+    # 💡 修正：正確讀取 notes_history 陣列
     notes = data.get("notes_history", [])
     notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)]) if notes else "目前無筆記"
     
@@ -161,7 +162,7 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📊 *當前戰情室參數：*\n\n"
         f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n\n"
-        f"📝 線上記事本 (近期筆記)：\n{notes_str}\n\n"
+        f"📝 *線上記事本 (近期筆記)：*\n{notes_str}\n\n"
         f"🌐 *最近留言板 (最後3則)：*\n{chat_str}",
         parse_mode="Markdown"
     )
@@ -345,7 +346,7 @@ st.sidebar.header("🛠️ 工具與線上記事本")
 with st.sidebar.expander("📝 核心紀律 & 臨時心得牆", expanded=True):
     st.markdown("**【個人線上記事本 (上限10則)】**")
     
-    # 動態渲染記事本歷史 (將最新的筆記依序顯示在上方)
+    # 動態渲染記事本歷史
     current_data = load_data()
     notes = current_data.get("notes_history", [])
     if notes:
@@ -355,8 +356,21 @@ with st.sidebar.expander("📝 核心紀律 & 臨時心得牆", expanded=True):
         st.caption("目前無記事紀錄")
         
     st.markdown("---")
-    st.text_area("✍️ 新增臨時心得/紀律：", height=100, key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Ctrl+Enter 儲存...")
+    
+    # 💡 改用 text_input，按 Enter 就能立刻存入上方記事本
+    def add_note_cb():
+        raw_text = st.session_state.get("trading_note_val", "")
+        if raw_text:
+            data = load_data()
+            if "notes_history" not in data: data["notes_history"] = []
+            data["notes_history"].append(raw_text)
+            if len(data["notes_history"]) > 10:
+                data["notes_history"].pop(0)
+            save_data(data)
+            st.session_state.trading_note_val = ""
 
+    st.text_input("✍️ 新增臨時心得：", key="trading_note_val", on_change=add_note_cb, placeholder="輸入後按 Enter 儲存...")
+    
 market_data, fetch_errors = fetch_market_data()
 
 if fetch_errors and market_data is None:
