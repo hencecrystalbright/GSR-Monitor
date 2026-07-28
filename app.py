@@ -366,7 +366,7 @@ if market_data:
 
 # --- 放在主畫面最下方的「多語交流聊天室 (精簡美化版)」 ---
 st.markdown("---")
-st.markdown("### 🌐 多語交流聊天室 (Chat & Translation Wall)")
+st.markdown("### 🌐 多語交流留言版 (Multilingual Message Board)")
 st.caption("在此輸入訊息，系統將自動翻譯並記錄最近 20 則對話，支援 Telegram 雙向同步。")
 
 def add_chat_cb():
@@ -404,4 +404,4 @@ else:
     st.info("目前尚無對話紀錄，趕快在上方輸入第一句話吧！")
     
 st.divider()
-st.caption("以上僅供研究參考，不構成投資建議，各人造業各人擔。")
+st.caption("以上僅供研究參考，不構成投資建議，各人造業各人擔。AI can make mistakes. Please double-check . ")
