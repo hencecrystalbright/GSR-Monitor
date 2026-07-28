@@ -29,45 +29,47 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 DATA_FILE = "data.json"
 
 def load_data():
-    # 預設基準值
-    default_data = {"sh_premium": 12.22, "trading_note": "", "chat_history": []}
-    
+    default_data = {"sh_premium": 12.22, "notes_history": ["1. 達極端溢價時避開 COMEX 空單", "2. GSR 突破門檻分批套利", "3. 嚴格執行止損"], "chat_history": []}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # 確保欄位完整，若缺少的補上預設格式但不破壞現有資料
                 if "chat_history" not in data: data["chat_history"] = []
-                if "trading_note" not in data: data["trading_note"] = ""
+                # 兼容舊版單筆筆記，若無 notes_history 則轉為陣列
+                if "notes_history" not in data:
+                    old_note = data.get("trading_note", "")
+                    data["notes_history"] = [old_note] if old_note else ["1. 達極端溢價時避開 COMEX 空單"]
                 if "sh_premium" not in data: data["sh_premium"] = 12.22
                 return data
         except Exception:
             pass
-            
-    # 如果檔案不存在，才建立並寫入預設值
     save_data(default_data)
     return default_data
 
 def save_data(data):
-    # 💡 防護網：絕對不允許儲存空的或格式錯誤的資料把歷史洗掉
-    if not isinstance(data, dict):
-        return
+    if not isinstance(data, dict): return
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 def update_premium_cb():
     data = load_data()
     data["sh_premium"] = st.session_state.sh_premium_val
     save_data(data)
 
+# 網頁端新增筆記回調（最多保留 10 則，先進先出）
 def update_note_cb():
-    data = load_data()
-    data["trading_note"] = st.session_state.trading_note_val
-    save_data(data)
+    raw_text = st.session_state.get("trading_note_val", "")
+    if raw_text:
+        data = load_data()
+        if "notes_history" not in data: data["notes_history"] = []
+        data["notes_history"].append(raw_text)
+        if len(data["notes_history"]) > 10:
+            data["notes_history"].pop(0)
+        save_data(data)
+        st.session_state.trading_note_val = ""
 
-# 每次重新整理或查詢時，強制同步最新資料到 session_state
 saved_data = load_data()
 st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
-st.session_state.trading_note_val = saved_data.get("trading_note", "")
 
 try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
@@ -84,9 +86,9 @@ async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🪙 *金銀戰情室控制台已連線！*\n\n"
         "指令列表：\n"
         "1. `/p 12.35` ：更新溢價\n"
-        "2. `/n` 或 `/note` ：新增純文字筆記\n"
-        "3. `/t` 或 `/trans` ：多國語言自動翻譯並寫入聊天室\n"
-        "4. `/get` ：查詢當前設定與近期對話",
+        "2. `/n 筆記內容` ：新增記事本心得 (最多10則)\n"
+        "3. `/t 翻譯內容` ：多語自動翻譯並寫入留言板\n"
+        "4. `/get` ：查詢當前設定與近期資料",
         parse_mode="Markdown"
     )
 
@@ -109,12 +111,17 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     text = " ".join(context.args)
     if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/n 今天觀望`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/n 注意美盤開盤`", parse_mode="Markdown")
         return
+    
     data = load_data()
-    data["trading_note"] = text
+    if "notes_history" not in data: data["notes_history"] = []
+    data["notes_history"].append(text)
+    if len(data["notes_history"]) > 10:
+        data["notes_history"].pop(0)
     save_data(data)
-    await update.message.reply_text(f"📝 *純文字筆記已更新：*\n\n`{text}`", parse_mode="Markdown")
+    
+    await update.message.reply_text(f"📝 *線上記事本已新增：*\n\n`{text}`\n*(目前共存 {len(data['notes_history'])} 則，上限10則)*", parse_mode="Markdown")
 
 async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
@@ -128,7 +135,6 @@ async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trans_en = GoogleTranslator(source=src_lang, target='en').translate(text)
         trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(text)
         
-        # 精簡雙行格式
         final_msg = f"🇬🇧 {trans_en}\n\n🇨🇳 {trans_zh} ｜ 🇻🇳 {trans_vi}"
     except Exception:
         final_msg = f"🇬🇧 {text}\n\n*(⚠️ 翻譯失敗)*"
@@ -140,21 +146,23 @@ async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["chat_history"].pop(0)
     save_data(data)
     
-    await update.message.reply_text(f"🌐 *新對話已同步加入聊天室！*\n\n{final_msg}", parse_mode="Markdown")
+    await update.message.reply_text(f"🌐 *新對話已同步加入留言板！*\n\n{final_msg}", parse_mode="Markdown")
 
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     
-    # 💡 絕對正確抓取 chat_history 陣列
+    notes = data.get("notes_history", [])
+    notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)]) if notes else "目前無筆記"
+    
     history = data.get("chat_history", [])
     chat_str = "\n\n---\n\n".join(history[-3:]) if history else "目前無對話"
     
     await update.message.reply_text(
         f"📊 *當前戰情室參數：*\n\n"
         f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n\n"
-        f"📝 純文字筆記：\n`{data.get('trading_note')}`\n\n"
-        f"🌐 *最近對話紀錄 (最後3則)：*\n{chat_str}",
+        f"📝 線上記事本 (近期筆記)：\n{notes_str}\n\n"
+        f"🌐 *最近留言板 (最後3則)：*\n{chat_str}",
         parse_mode="Markdown"
     )
 
@@ -332,13 +340,22 @@ premium_upper = st.sidebar.slider("溢價極端門檻 (%)", 15.0, 30.0, 20.0, 0.
 premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", 0.0, 15.0, 10.0, 0.5, key="premium_lower_val")
 
 st.sidebar.markdown("---")
-st.sidebar.header("🛠️ 工具與個人戰術筆記")
+st.sidebar.header("🛠️ 工具與線上記事本")
 
-with st.sidebar.expander("📝 教戰手則 & 臨時筆記", expanded=True):
-    st.markdown("**【個人核心交易紀律】**")
-    st.caption("1. \n2. \n3. ")
+with st.sidebar.expander("📝 核心紀律 & 臨時心得牆", expanded=True):
+    st.markdown("**【個人線上記事本 (上限10則)】**")
+    
+    # 動態渲染記事本歷史 (將最新的筆記依序顯示在上方)
+    current_data = load_data()
+    notes = current_data.get("notes_history", [])
+    if notes:
+        for idx, note_text in enumerate(notes, 1):
+            st.markdown(f"{idx}. {note_text}")
+    else:
+        st.caption("目前無記事紀錄")
+        
     st.markdown("---")
-    st.text_area("✍️ 輸入臨時心得（純紀錄）：", height=100, key="trading_note_val", on_change=update_note_cb)
+    st.text_area("✍️ 新增臨時心得/紀律：", height=100, key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Ctrl+Enter 儲存...")
 
 market_data, fetch_errors = fetch_market_data()
 
@@ -364,10 +381,10 @@ if market_data:
     today = datetime.now().date()
     st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
 
-# --- 放在主畫面最下方的「多語交流聊天室 (精簡美化版)」 ---
+# --- 放在主畫面最下方的「多語戰情室留言板」 ---
 st.markdown("---")
-st.markdown("### 🌐 多語交流留言版 (Multilingual Message Board)")
-st.caption("在此輸入訊息，系統將自動翻譯並記錄最近 20 則對話，支援 Telegram 雙向同步。")
+st.markdown("### 📋 多語戰情室留言板 (Multilingual Message Board)")
+st.caption("在此輸入訊息，系統將自動翻譯並記錄最近 20 則留言。可透過 Telegram 隨時發送與查詢最新留言。")
 
 def add_chat_cb():
     raw_text = st.session_state.get("new_chat_val", "")
@@ -378,7 +395,6 @@ def add_chat_cb():
             trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
             trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
             
-            # 💡 確保格式雙邊一致（精簡雙行）
             formatted_msg = f"🇬🇧 {trans_en}\n\n🇨🇳 {trans_zh} ｜ 🇻🇳 {trans_vi}"
         except Exception:
             formatted_msg = f"🇬🇧 {raw_text}\n\n*(⚠️ 翻譯失敗)*"
@@ -391,9 +407,9 @@ def add_chat_cb():
         save_data(data)
         st.session_state.new_chat_val = ""
 
-st.text_input("💬 輸入想翻譯交流的新訊息：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入後按 Enter 發送...")
+st.text_input("✍️ 新增留言與多語翻譯：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入內容後按 Enter 提交...")
 
-# 渲染歷史對話牆 (美化卡片外觀)
+# 渲染歷史留言牆 (美化卡片外觀)
 data = load_data()
 chat_history = data.get("chat_history", [])
 if chat_history:
@@ -401,7 +417,7 @@ if chat_history:
         with st.container(border=True):
             st.markdown(chat)
 else:
-    st.info("目前尚無對話紀錄，趕快在上方輸入第一句話吧！")
+    st.info("目前尚無留言紀錄，趕快在上方留下第一則訊息吧！")
     
 st.divider()
-st.caption("以上僅供研究參考，不構成投資建議，各人造業各人擔。AI can make mistakes. Please double-check . ")
+st.caption("以上僅供研究參考，不構成投資建議，各人造業各人擔。")
