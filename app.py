@@ -8,6 +8,7 @@ import pandas as pd
 import requests
 from datetime import datetime, date
 import calendar
+from deep_translator import GoogleTranslator
 
 st.set_page_config(
     page_title="金銀市場與套利監測(自動化版)", page_icon="🪙", layout="centered"
@@ -104,14 +105,28 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     text = " ".join(context.args)
     if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/note 注意 CPI`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/note hawkish FED`", parse_mode="Markdown")
         return
-    data = load_data()
-    data["trading_note"] = text
-    save_data(data)
-    st.session_state.trading_note_val = text
-    await update.message.reply_text(f"📝 戰術筆記已更新：\n\n`{text}`", parse_mode="Markdown")
-
+     
+    try:
+        # 1. 執行免費翻譯：自動偵測輸入的語言，並翻譯成繁體中文 ('zh-TW')
+        translated_text = GoogleTranslator(source='auto', target='zh-TW').translate(text)
+        
+        # 2. 將原文與翻譯組合成漂亮的格式
+        final_note = f"【原文】{text}\n【翻譯】{translated_text}"
+        
+        # 3. 存進 Streamlit 的 JSON 檔案與 Session 裡
+        data = load_data()
+        data["trading_note"] = final_note
+        save_data(data)
+        st.session_state.trading_note_val = final_note
+        
+        # 4. 把翻譯結果直接推播回 Telegram 當對話框！
+        await update.message.reply_text(f"📝 *翻譯完成並寫入筆記！*\n\n`{final_note}`", parse_mode="Markdown")
+        
+    except Exception as e:
+        await update.message.reply_text(f"❌ 翻譯或存檔失敗：{e}")
+        
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
