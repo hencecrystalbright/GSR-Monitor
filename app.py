@@ -142,11 +142,16 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
+    
+    # 把 chat_history 陣列組合成漂亮的字串顯示
+    history = data.get("chat_history", [])
+    chat_str = "\n\n".join(history[:5]) if history else "目前無對話"
+    
     await update.message.reply_text(
         f"📊 *當前戰情室參數：*\n\n"
         f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n\n"
         f"📝 純文字筆記：\n`{data.get('trading_note')}`\n\n"
-        f"🌐 翻譯紀錄：\n`{data.get('trans_note')}`",
+        f"🌐 最近多語聊天紀錄 (前5則)：\n{chat_str}",
         parse_mode="Markdown"
     )
 
