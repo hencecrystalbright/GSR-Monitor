@@ -169,35 +169,34 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-def run_bot_thread():
-    # 設定獨立的 Event Loop，避免 Streamlit 衝突
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    try:
-        bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
-        bot_app.add_handler(CommandHandler("start", tg_start))
-        bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
-        # 新增縮寫支援：同時聽得懂 /n 與 /note
-        bot_app.add_handler(CommandHandler(["n", "note"], tg_set_note))       
-        # 新增縮寫支援：同時聽得懂 /t 與 /trans
-        bot_app.add_handler(CommandHandler(["t", "trans"], tg_set_trans))     
-        bot_app.add_handler(CommandHandler("get", tg_get_status))
-        # 關鍵修正：stop_signals=None
-        # run_polling() 預設會嘗試註冊 SIGINT/SIGTERM 訊號處理器，
-        # 但訊號處理器只能在「主執行緒」註冊；這裡是背景執行緒，不設 stop_signals=None
-        # 會直接丟出 ValueError 讓這條 thread 靜默死掉（daemon thread 例外不會顯示在畫面上）。
-        bot_app.run_polling(drop_pending_updates=True, stop_signals=None)
-    except Exception as e:
-        # 印出錯誤，方便到 Streamlit Cloud 的 Manage app → Logs 查看，不再靜默失敗
-        print(f"[Telegram Bot Thread Error] {e}")
+# --- Telegram Bot 背景執行緒 (使用 Streamlit 官方 Cache 機制) ---
+@st.cache_resource
+def start_telegram_bot():
+    def run_bot_thread():
+        # 設定獨立的 Event Loop
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        try:
+            bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
+            bot_app.add_handler(CommandHandler("start", tg_start))
+            bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
+            bot_app.add_handler(CommandHandler(["n", "note"], tg_set_note))
+            bot_app.add_handler(CommandHandler(["t", "trans"], tg_set_trans))
+            bot_app.add_handler(CommandHandler("get", tg_get_status))
+            
+            # 💡 故意印出這行字，方便我們在 Logs 裡面確認它真的有活過來！
+            print("🚀 Telegram Bot 背景服務啟動成功！開始監聽指令...") 
+            
+            bot_app.run_polling(drop_pending_updates=True, stop_signals=None)
+        except Exception as e:
+            print(f"❌ [Telegram Bot Error] {e}")
 
-# 啟動背景執行緒（只在「整個伺服器程序」啟動時執行一次，而不是每個使用者連線都各自啟動一次）
-# 注意：原本用 st.session_state 判斷是「每個瀏覽器分頁/使用者」各自的狀態，
-# 如果同時有兩個 session 都判斷「尚未啟動」，會同時起兩條 thread 對同一個 BOT_TOKEN 做 polling，
-# Telegram 只允許同時一個 polling 連線，會導致 Conflict 錯誤。改用全域旗標避免重複啟動。
+    thread = threading.Thread(target=run_bot_thread, daemon=True)
+    thread.start()
+    return thread
+
+# 啟動機器人 (只要有設定 Token 就自動執行)
 if BOT_TOKEN and ALLOWED_CHAT_ID:
-    if "_bot_thread_started" not in globals():
-        globals()["_bot_thread_started"] = True
-        threading.Thread(target=run_bot_thread, daemon=True).start()
+    start_telegram_bot()
 
 def send_telegram_alert(message):
     if not BOT_TOKEN or not ALLOWED_CHAT_ID:
