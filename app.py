@@ -62,7 +62,7 @@ if "trading_note_val" not in st.session_state:
     st.session_state.trading_note_val = saved_data.get("trading_note", "")
 
 # --- Telegram 雙向控制 Bot 背景服務 ---
-BOT_TOKEN = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU"
+BOT_TOKEN = "st.secrets["BOT_TOKEN"]"
 ALLOWED_CHAT_ID = "5259644398"
 
 async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
