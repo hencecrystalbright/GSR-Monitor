@@ -33,7 +33,7 @@ def load_data():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if "chat_history" not in data: data["chat_history"] = [] # 改用陣列儲存多則對話
+                if "chat_history" not in data: data["chat_history"] = []
                 if "trading_note" not in data: data["trading_note"] = ""
                 return data
         except Exception:
@@ -54,34 +54,11 @@ def update_note_cb():
     data["trading_note"] = st.session_state.trading_note_val
     save_data(data)
 
-def update_trans_cb():
-    raw_text = st.session_state.trans_note_val
-    if raw_text and not raw_text.startswith("【原文】"):
-        try:
-            src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', raw_text) else 'auto'
-            trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
-            trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
-            trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
-            final_note = f"【原文】{raw_text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
-        except Exception:
-            final_note = f"【原文】{raw_text}\n(⚠️ 翻譯失敗陣列，僅保留原文)"
-            
-        data = load_data()
-        data["trans_note"] = final_note
-        save_data(data)
-        st.session_state.trans_note_val = final_note
-    else:
-        data = load_data()
-        data["trans_note"] = raw_text
-        save_data(data)
-
+# 每次重新整理或查詢時，強制同步最新資料到 session_state
 saved_data = load_data()
-
-# 💡 每次網頁重新整理或重新查詢時，直接強制把 JSON 的最新資料灌進 session_state 裡面！
-# 這樣網頁的輸入框才會乖乖顯示 Telegram 剛更新過的新數值，絕不覆蓋。
 st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
 st.session_state.trading_note_val = saved_data.get("trading_note", "")
-st.session_state.trans_note_val = saved_data.get("trans_note", "")
+
 try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
     ALLOWED_CHAT_ID = str(st.secrets["ALLOWED_CHAT_ID"])
@@ -90,7 +67,7 @@ except Exception:
     ALLOWED_CHAT_ID = None
     st.sidebar.error("⚠️ 尚未設定 Telegram Secrets，推播與雙向控制功能停用。")
 
-# --- Telegram 機器人非同步控制函數 (提前宣告) ---
+# --- Telegram 機器人非同步控制函數 ---
 async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     await update.message.reply_text(
@@ -98,8 +75,8 @@ async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "指令列表：\n"
         "1. `/p 12.35` ：更新溢價\n"
         "2. `/n` 或 `/note` ：新增純文字筆記\n"
-        "3. `/t` 或 `/trans` ：多國語言自動翻譯\n"
-        "4. `/get` ：查詢當前設定",
+        "3. `/t` 或 `/trans` ：多國語言自動翻譯並寫入聊天室\n"
+        "4. `/get` ：查詢當前設定與近期對話",
         parse_mode="Markdown"
     )
 
@@ -128,30 +105,45 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["trading_note"] = text
     save_data(data)
     await update.message.reply_text(f"📝 *純文字筆記已更新：*\n\n`{text}`", parse_mode="Markdown")
-   
+
+async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    text = " ".join(context.args)
+    if not text:
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/t hawkish FED`", parse_mode="Markdown")
+        return
+    try:
+        src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', text) else 'auto'
+        trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(text)
+        trans_en = GoogleTranslator(source=src_lang, target='en').translate(text)
+        trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(text)
+        
+        # 精簡雙行格式
+        final_msg = f"🇬🇧 {trans_en}\n\n🇨🇳 {trans_zh} ｜ 🇻🇳 {trans_vi}"
+    except Exception:
+        final_msg = f"🇬🇧 {text}\n\n*(⚠️ 翻譯失敗)*"
     
     data = load_data()
     if "chat_history" not in data: data["chat_history"] = []
-    data["chat_history"].insert(0, final_msg)
-    data["chat_history"] = data["chat_history"][:20]
+    data["chat_history"].append(final_msg)
+    if len(data["chat_history"]) > 20:
+        data["chat_history"].pop(0)
     save_data(data)
     
-    await update.message.reply_text(f"🌐 *新對話已加入聊天室！*\n\n`{final_msg}`", parse_mode="Markdown")
-       
-    
+    await update.message.reply_text(f"🌐 *新對話已同步加入聊天室！*\n\n{final_msg}", parse_mode="Markdown")
+
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     
-    # 把 chat_history 陣列組合成漂亮的字串顯示
     history = data.get("chat_history", [])
-    chat_str = "\n\n".join(history[:5]) if history else "目前無對話"
+    chat_str = "\n\n---\n\n".join(history[-3:]) if history else "目前無對話"
     
     await update.message.reply_text(
         f"📊 *當前戰情室參數：*\n\n"
         f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n\n"
         f"📝 純文字筆記：\n`{data.get('trading_note')}`\n\n"
-        f"🌐 最近多語聊天紀錄 (前5則)：\n{chat_str}",
+        f"🌐 最近對話紀錄 (最後3則)：\n{chat_str}",
         parse_mode="Markdown"
     )
 
@@ -336,7 +328,7 @@ with st.sidebar.expander("📝 教戰手則 & 臨時筆記", expanded=True):
     st.caption("1. 達極端溢價時避開 COMEX 空單\n2. GSR 突破門檻分批套利\n3. 嚴格執行止損")
     st.markdown("---")
     st.text_area("✍️ 輸入臨時心得（純紀錄）：", height=100, key="trading_note_val", on_change=update_note_cb)
-   
+
 market_data, fetch_errors = fetch_market_data()
 
 if fetch_errors and market_data is None:
@@ -361,10 +353,10 @@ if market_data:
     today = datetime.now().date()
     st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
 
-# --- 放在主畫面最下方的「多語交流聊天室 (美化版)」 ---
+# --- 放在主畫面最下方的「多語交流聊天室 (精簡美化版)」 ---
 st.markdown("---")
 st.markdown("### 🌐 多語交流聊天室 (Chat & Translation Wall)")
-st.caption("在此輸入訊息，系統將自動同步翻譯並記錄對話。最新對話將顯示在下方。")
+st.caption("在此輸入訊息，系統將自動翻譯並記錄最近 20 則對話，支援 Telegram 雙向同步。")
 
 def add_chat_cb():
     raw_text = st.session_state.get("new_chat_val", "")
@@ -375,7 +367,7 @@ def add_chat_cb():
             trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
             trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
             
-            # 💡 精簡格式：英文一行，中越文並列同行
+            # 精簡雙行格式
             formatted_msg = f"🇬🇧 {trans_en}\n\n🇨🇳 {trans_zh} ｜ 🇻🇳 {trans_vi}"
         except Exception:
             formatted_msg = f"🇬🇧 {raw_text}\n\n*(⚠️ 翻譯失敗)*"
