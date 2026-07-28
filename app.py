@@ -361,10 +361,10 @@ if market_data:
     today = datetime.now().date()
     st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
 
-# --- 放在主畫面最下方的「多語交流聊天室 (正常聊天排序)」 ---
+# --- 放在主畫面最下方的「多語交流聊天室 (美化版)」 ---
 st.markdown("---")
 st.markdown("### 🌐 多語交流聊天室 (Chat & Translation Wall)")
-st.caption("在此輸入中文、英文或越南語，系統將自動同步翻譯並記錄對話，最新訊息會顯示在最下方。")
+st.caption("在此輸入訊息，系統將自動同步翻譯並記錄對話。最新對話將顯示在下方。")
 
 def add_chat_cb():
     raw_text = st.session_state.get("new_chat_val", "")
@@ -374,33 +374,29 @@ def add_chat_cb():
             trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
             trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
             trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
-            formatted_msg = f"【原文】{raw_text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
+            formatted_msg = f"**【原文】** {raw_text}\n\n🇹🇼 **【中】** {trans_zh}\n\n🇬🇧 **【EN】** {trans_en}\n\n🇻🇳 **【VN】** {trans_vi}"
         except Exception:
-            formatted_msg = f"【原文】{raw_text}\n(⚠️ 翻譯失敗)"
+            formatted_msg = f"**【原文】** {raw_text}\n\n*(⚠️ 翻譯 API 暫時受阻)*"
             
         data = load_data()
         if "chat_history" not in data: data["chat_history"] = []
-        
-        # 1. 用 append 放到清單最尾端（新訊息在下面）
         data["chat_history"].append(formatted_msg)
-        
-        # 2. 如果超過 20 則，把最舊的那一筆（index 0）自動刪除
         if len(data["chat_history"]) > 20:
             data["chat_history"].pop(0)
-            
         save_data(data)
         st.session_state.new_chat_val = ""
 
 st.text_input("💬 輸入想翻譯交流的新訊息：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入後按 Enter 發送...")
 
-# 渲染歷史對話牆（依序由上到下顯示，最新在底部）
+# 渲染歷史對話牆 (美化卡片外觀)
 data = load_data()
 chat_history = data.get("chat_history", [])
 if chat_history:
     for chat in chat_history:
-        st.info(chat)
+        with st.container(border=True):
+            st.markdown(chat)
 else:
-    st.text("目前尚無對話紀錄，趕快輸入第一句話吧！")
+    st.info("目前尚無對話紀錄，趕快在上方輸入第一句話吧！")
     
 st.divider()
 st.caption("以上僅供研究參考，不構成投資建議，各人造業各人擔。")
