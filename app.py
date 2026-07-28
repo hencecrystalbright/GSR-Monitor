@@ -93,11 +93,13 @@ async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         raw_val = context.args[0].replace("%", "")
         val = float(raw_val)
+        
+        # 1. 僅讀寫 JSON，絕對不碰 st.session_state
         data = load_data()
         data["sh_premium"] = val
         save_data(data)
-        st.session_state.sh_premium_val = val
-        await update.message.reply_text(f"✅ 上海銀溢價已更新為：*{val}%*", parse_mode="Markdown")
+        
+        await update.message.reply_text(f"✅ 上海銀溢價已更新為：*{val}%*\n_(請重新整理 Streamlit 網頁以載入最新數據)_", parse_mode="Markdown")
     except ValueError:
         await update.message.reply_text("❌ 請輸入有效的數字格式！")
 
@@ -111,24 +113,25 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from deep_translator import GoogleTranslator
         
-        # 1. 執行多國語言翻譯 (自動偵測輸入語言)
-        trans_zh = GoogleTranslator(source='auto', target='zh-TW').translate(text)
-        trans_en = GoogleTranslator(source='auto', target='en').translate(text)
-        trans_vi = GoogleTranslator(source='auto', target='vi').translate(text)
+        # 嘗試翻譯，若被 Google 阻擋則回傳提示
+        try:
+            trans_zh = GoogleTranslator(source='auto', target='zh-TW').translate(text)
+            trans_en = GoogleTranslator(source='auto', target='en').translate(text)
+            trans_vi = GoogleTranslator(source='auto', target='vi').translate(text)
+            final_note = f"【原文】{text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
+        except Exception as e:
+            # 翻譯失敗時的備用方案 (只存原文)
+            final_note = f"【原文】{text}\n(⚠️ Google 翻譯 API 暫時阻擋，僅儲存原文)"
         
-        # 2. 組合多語種筆記格式
-        final_note = f"【原文】{text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
-        
-        # 3. 存入 JSON 檔案 (供 Streamlit 網頁下次重整時讀取)
+        # 2. 僅讀寫 JSON，絕對不碰 st.session_state
         data = load_data()
         data["trading_note"] = final_note
         save_data(data)
         
-        # 4. 回傳給 Telegram
-        await update.message.reply_text(f"📝 *多語翻譯完成並寫入！*\n\n`{final_note}`", parse_mode="Markdown")
+        await update.message.reply_text(f"📝 *筆記已寫入！*\n\n`{final_note}`\n\n_(請重新整理 Streamlit 網頁查看)_", parse_mode="Markdown")
         
     except Exception as e:
-        await update.message.reply_text(f"❌ 翻譯或存檔失敗：{e}")
+        await update.message.reply_text(f"❌ 存檔失敗：{e}")
         
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
