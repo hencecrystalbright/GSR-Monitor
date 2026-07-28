@@ -77,13 +77,11 @@ def update_trans_cb():
 
 saved_data = load_data()
 
-# 💡 只有當 session_state 裡面還沒有這些變數時，才從 JSON 讀取一次；之後交給互動控制
-if "sh_premium_val" not in st.session_state:
-    st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
-if "trading_note_val" not in st.session_state:
-    st.session_state.trading_note_val = saved_data.get("trading_note", "")
-if "trans_note_val" not in st.session_state:
-    st.session_state.trans_note_val = saved_data.get("trans_note", "")
+# 💡 每次網頁重新整理或重新查詢時，直接強制把 JSON 的最新資料灌進 session_state 裡面！
+# 這樣網頁的輸入框才會乖乖顯示 Telegram 剛更新過的新數值，絕不覆蓋。
+st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
+st.session_state.trading_note_val = saved_data.get("trading_note", "")
+st.session_state.trans_note_val = saved_data.get("trans_note", "")
 try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
     ALLOWED_CHAT_ID = str(st.secrets["ALLOWED_CHAT_ID"])
