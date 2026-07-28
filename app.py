@@ -175,9 +175,11 @@ def run_bot_thread():
     try:
         bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
         bot_app.add_handler(CommandHandler("start", tg_start))
-        bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium)) #溢價(支援 /p 或 /premium)
-        bot_app.add_handler(CommandHandler(["n", "note"], tg_set_note))       # 純筆記(支援 /n 或 /note)
-        bot_app.add_handler(CommandHandler(["t", "trans"], tg_set_trans)) # 翻譯機 (支援 /t 或 /trans)
+        bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
+        # 新增縮寫支援：同時聽得懂 /n 與 /note
+        bot_app.add_handler(CommandHandler(["n", "note"], tg_set_note))       
+        # 新增縮寫支援：同時聽得懂 /t 與 /trans
+        bot_app.add_handler(CommandHandler(["t", "trans"], tg_set_trans))     
         bot_app.add_handler(CommandHandler("get", tg_get_status))
         # 關鍵修正：stop_signals=None
         # run_polling() 預設會嘗試註冊 SIGINT/SIGTERM 訊號處理器，
