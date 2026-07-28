@@ -76,10 +76,11 @@ def update_trans_cb():
         save_data(data)
 
 saved_data = load_data()
-if "sh_premium_val" not in st.session_state: st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
-if "trading_note_val" not in st.session_state: st.session_state.trading_note_val = saved_data.get("trading_note", "")
-if "trans_note_val" not in st.session_state: st.session_state.trans_note_val = saved_data.get("trans_note", "")
 
+# 💡 不管網頁有沒有開過，每次重新整理或重新查詢，都強制從 JSON 把最新資料刷進畫面變數中！
+st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
+st.session_state.trading_note_val = saved_data.get("trading_note", "")
+st.session_state.trans_note_val = saved_data.get("trans_note", "")
 try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
     ALLOWED_CHAT_ID = str(st.secrets["ALLOWED_CHAT_ID"])
