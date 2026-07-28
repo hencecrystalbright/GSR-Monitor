@@ -374,9 +374,11 @@ def add_chat_cb():
             trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
             trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
             trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
-            formatted_msg = f"**【原文】** {raw_text}\n\n🇹🇼 **【中】** {trans_zh}\n\n🇬🇧 **【EN】** {trans_en}\n\n🇻🇳 **【VN】** {trans_vi}"
+            
+            # 💡 精簡格式：英文一行，中越文並列同行
+            formatted_msg = f"🇬🇧 {trans_en}\n\n🇨🇳 {trans_zh} ｜ 🇻🇳 {trans_vi}"
         except Exception:
-            formatted_msg = f"**【原文】** {raw_text}\n\n*(⚠️ 翻譯 API 暫時受阻)*"
+            formatted_msg = f"🇬🇧 {raw_text}\n\n*(⚠️ 翻譯失敗)*"
             
         data = load_data()
         if "chat_history" not in data: data["chat_history"] = []
