@@ -136,14 +136,19 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     
+    # 正確讀取 chat_history 陣列中的最後幾則對話
     history = data.get("chat_history", [])
-    chat_str = "\n\n---\n\n".join(history[-3:]) if history else "目前無對話"
+    if history:
+        # 取出最近 3 則對話並組合成字串
+        chat_str = "\n\n---\n\n".join(history[-3:])
+    else:
+        chat_str = "目前無對話紀錄"
     
     await update.message.reply_text(
         f"📊 *當前戰情室參數：*\n\n"
         f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n\n"
         f"📝 純文字筆記：\n`{data.get('trading_note')}`\n\n"
-        f"🌐 最近對話紀錄 (最後3則)：\n{chat_str}",
+        f"🌐 *最近對話紀錄牆：*\n{chat_str}",
         parse_mode="Markdown"
     )
 
