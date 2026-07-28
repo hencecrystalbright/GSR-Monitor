@@ -336,7 +336,7 @@ st.sidebar.header("🛠️ 工具與個人戰術筆記")
 
 with st.sidebar.expander("📝 教戰手則 & 臨時筆記", expanded=True):
     st.markdown("**【個人核心交易紀律】**")
-    st.caption("1. 達極端溢價時避開 COMEX 空單\n2. GSR 突破門檻分批套利\n3. 嚴格執行止損")
+    st.caption("1. \n2. \n3. ")
     st.markdown("---")
     st.text_area("✍️ 輸入臨時心得（純紀錄）：", height=100, key="trading_note_val", on_change=update_note_cb)
 
