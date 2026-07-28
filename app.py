@@ -116,22 +116,26 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-def run_bot_thread():
-    # 設定獨立的 Event Loop，避免 Streamlit 衝突
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
-    bot_app.add_handler(CommandHandler("start", tg_start))
-    bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
-    bot_app.add_handler(CommandHandler("note", tg_set_note))
-    bot_app.add_handler(CommandHandler("get", tg_get_status))
-    # 啟動接收，並丟棄重啟期間累積的舊訊息避免報錯
-    bot_app.run_polling(drop_pending_updates=True)
+# --- Telegram 雙向控制 Bot 背景服務 ---
+@st.cache_resource
+def start_telegram_bot():
+    def run_bot_thread():
+        # 設定獨立的 Event Loop，避免 Streamlit 衝突
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
+        bot_app.add_handler(CommandHandler("start", tg_start))
+        bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
+        bot_app.add_handler(CommandHandler("note", tg_set_note))
+        bot_app.add_handler(CommandHandler("get", tg_get_status))
+        # 啟動接收，並丟棄重啟期間累積的舊訊息避免報錯
+        bot_app.run_polling(drop_pending_updates=True)
+        
+    thread = threading.Thread(target=run_bot_thread, daemon=True)
+    thread.start()
+    return thread
 
-# 啟動背景執行緒（只在伺服器啟動時執行一次）
-if "bot_thread_started" not in st.session_state:
-    st.session_state.bot_thread_started = True
-    threading.Thread(target=run_bot_thread, daemon=True).start()
-
+# 全域啟動 Telegram Bot (確保伺服器生命週期內絕對只有一個機器人在運作)
+start_telegram_bot()
    
 # --- Telegram 推播函數 ---
 def send_telegram_alert(message):
