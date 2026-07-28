@@ -92,10 +92,6 @@ if "trading_note_val" not in st.session_state: st.session_state.trading_note_val
 if "trans_note_val" not in st.session_state: st.session_state.trans_note_val = saved_data.get("trans_note", "")
 
 # --- Telegram 憑證：改用 st.secrets 讀取，不再寫死在程式碼裡 ---
-# 部署前請到 Streamlit Cloud → Manage app → Settings → Secrets 貼入：
-#   BOT_TOKEN = "你的機器人token"
-#   ALLOWED_CHAT_ID = "你的chat id"
-# 本機測試則在專案根目錄建立 .streamlit/secrets.toml 放相同內容（記得加進 .gitignore，不要上傳）
 try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
     ALLOWED_CHAT_ID = str(st.secrets["ALLOWED_CHAT_ID"])
@@ -115,6 +111,24 @@ async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "4. `/get` ：查詢當前設定",
         parse_mode="Markdown"
     )
+
+# 【修正】這個函式在上一版被誤刪，但下面 add_handler 仍在呼叫它，
+# 造成 NameError，導致整個 bot 在 run_polling() 啟動前就於背景執行緒當掉。
+async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    if not context.args:
+        await update.message.reply_text("⚠️ 請輸入數值，範例：`/p 12.35`", parse_mode="Markdown")
+        return
+    try:
+        raw_val = context.args[0].replace("%", "")
+        val = float(raw_val)
+        data = load_data()
+        data["sh_premium"] = val
+        save_data(data)
+        st.session_state.sh_premium_val = val
+        await update.message.reply_text(f"✅ 上海銀溢價已更新為：*{val}%*", parse_mode="Markdown")
+    except ValueError:
+        await update.message.reply_text("❌ 請輸入有效的數字格式！")
 
 async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 純文字筆記
