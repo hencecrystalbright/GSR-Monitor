@@ -41,7 +41,6 @@ def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# 👈 callback推薦放在這裡save_data之下！
 def update_premium_cb():
     data = load_data()
     data["sh_premium"] = st.session_state.sh_premium_val
@@ -52,7 +51,6 @@ def update_note_cb():
     data["trading_note"] = st.session_state.trading_note_val
     save_data(data)
 
-# 初始化載入 JSON 資料
 saved_data = load_data()
 
 if "sh_premium_val" not in st.session_state:
@@ -61,9 +59,18 @@ if "sh_premium_val" not in st.session_state:
 if "trading_note_val" not in st.session_state:
     st.session_state.trading_note_val = saved_data.get("trading_note", "")
 
-# --- Telegram 雙向控制 Bot 背景服務 ---
-BOT_TOKEN = "st.secrets["BOT_TOKEN"]"
-ALLOWED_CHAT_ID = "5259644398"
+# --- Telegram 憑證：改用 st.secrets 讀取，不再寫死在程式碼裡 ---
+# 部署前請到 Streamlit Cloud → Manage app → Settings → Secrets 貼入：
+#   BOT_TOKEN = "你的機器人token"
+#   ALLOWED_CHAT_ID = "你的chat id"
+# 本機測試則在專案根目錄建立 .streamlit/secrets.toml 放相同內容（記得加進 .gitignore，不要上傳）
+try:
+    BOT_TOKEN = st.secrets["BOT_TOKEN"]
+    ALLOWED_CHAT_ID = str(st.secrets["ALLOWED_CHAT_ID"])
+except Exception:
+    BOT_TOKEN = None
+    ALLOWED_CHAT_ID = None
+    st.sidebar.error("⚠️ 尚未設定 Telegram Secrets，推播與雙向控制功能停用。請至 App 設定新增 BOT_TOKEN / ALLOWED_CHAT_ID。")
 
 async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): 
@@ -83,7 +90,6 @@ async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ 請輸入數值，範例：`/p 12.35`", parse_mode="Markdown")
         return
     try:
-        # 自動去除使用者可能輸入的 % 符號
         raw_val = context.args[0].replace("%", "")
         val = float(raw_val)
         data = load_data()
@@ -116,34 +122,39 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# --- Telegram 雙向控制 Bot 背景服務 ---
-@st.cache_resource
-def start_telegram_bot():
-    def run_bot_thread():
-        # 設定獨立的 Event Loop，避免 Streamlit 衝突
-        asyncio.set_event_loop(asyncio.new_event_loop())
+def run_bot_thread():
+    # 設定獨立的 Event Loop，避免 Streamlit 衝突
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    try:
         bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
         bot_app.add_handler(CommandHandler("start", tg_start))
         bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
         bot_app.add_handler(CommandHandler("note", tg_set_note))
         bot_app.add_handler(CommandHandler("get", tg_get_status))
-        # 啟動接收，並丟棄重啟期間累積的舊訊息避免報錯
-        bot_app.run_polling(drop_pending_updates=True)
-        
-    thread = threading.Thread(target=run_bot_thread, daemon=True)
-    thread.start()
-    return thread
+        # 關鍵修正：stop_signals=None
+        # run_polling() 預設會嘗試註冊 SIGINT/SIGTERM 訊號處理器，
+        # 但訊號處理器只能在「主執行緒」註冊；這裡是背景執行緒，不設 stop_signals=None
+        # 會直接丟出 ValueError 讓這條 thread 靜默死掉（daemon thread 例外不會顯示在畫面上）。
+        bot_app.run_polling(drop_pending_updates=True, stop_signals=None)
+    except Exception as e:
+        # 印出錯誤，方便到 Streamlit Cloud 的 Manage app → Logs 查看，不再靜默失敗
+        print(f"[Telegram Bot Thread Error] {e}")
 
-# 全域啟動 Telegram Bot (確保伺服器生命週期內絕對只有一個機器人在運作)
-start_telegram_bot()
-   
-# --- Telegram 推播函數 ---
+# 啟動背景執行緒（只在「整個伺服器程序」啟動時執行一次，而不是每個使用者連線都各自啟動一次）
+# 注意：原本用 st.session_state 判斷是「每個瀏覽器分頁/使用者」各自的狀態，
+# 如果同時有兩個 session 都判斷「尚未啟動」，會同時起兩條 thread 對同一個 BOT_TOKEN 做 polling，
+# Telegram 只允許同時一個 polling 連線，會導致 Conflict 錯誤。改用全域旗標避免重複啟動。
+if BOT_TOKEN and ALLOWED_CHAT_ID:
+    if "_bot_thread_started" not in globals():
+        globals()["_bot_thread_started"] = True
+        threading.Thread(target=run_bot_thread, daemon=True).start()
+
 def send_telegram_alert(message):
-    bot_token = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU"
-    chat_id = "5259644398"
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    if not BOT_TOKEN or not ALLOWED_CHAT_ID:
+        return False
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": chat_id,
+        "chat_id": ALLOWED_CHAT_ID,
         "text": message
     }
     try:
@@ -156,7 +167,6 @@ def send_telegram_alert(message):
         st.sidebar.error(f"連線異常: {e}")
         return False
 
-# --- 重大數據曆法推算模組 ---
 def get_next_nfp(current_date):
     month, year = current_date.month, current_date.year
     c = calendar.monthcalendar(year, month)
@@ -190,14 +200,12 @@ def get_next_cpi(current_date):
             cpi_date = date(year, month, 14)
     return cpi_date
 
-# --- API 抓取模組 ---
 def fetch_metal_price(symbol):
     r = requests.get(f"https://api.gold-api.com/price/{symbol}", headers=HEADERS, timeout=10)
     r.raise_for_status()
     data = r.json()
     return float(data["price"]), data.get("updatedAt")
 
-# --- 獨立對 DXY 加快取 (ttl=300秒)，避免頻繁刷新衝撞 API 導致 429 或查詢失敗 ---
 @st.cache_data(ttl=300)
 def fetch_synthetic_dxy():
     try:
@@ -225,7 +233,7 @@ def fetch_synthetic_dxy():
         ) - 0.2  
         return dxy
     except Exception:
-        return None  # 若抓取失敗回傳 NA，由主程式呈現防護提示
+        return None
 
 def fetch_crypto_history(coin_id, days):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
@@ -323,7 +331,6 @@ if st.button("🔄 重新查詢", use_container_width=True):
     st.cache_data.clear()
     st.toast("已清除 API 快取並更新數據！", icon="✅")
 
-# --- 側邊欄設計 (直接綁定 st.session_state) ---
 st.sidebar.header("📌 上海銀溢價輸入區")
 sh_premium = st.sidebar.number_input(
     "今日上海銀溢價 Premium (%)", step=0.1, 
@@ -346,11 +353,9 @@ st.sidebar.markdown("<br>", unsafe_allow_html=True)
 premium_upper = st.sidebar.slider("溢價極端門檻 (%)", min_value=15.0, max_value=30.0, value=20.0, step=0.5, key="premium_upper_val")
 premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", min_value=0.0, max_value=15.0, value=10.0, step=0.5, key="premium_lower_val")
 
-# --- 側邊欄底部工具箱（緊湊整合版） ---
 st.sidebar.markdown("---")
 st.sidebar.header("🛠️ 工具與個人戰術筆記")
 
-# 1. 測試推播 (改用 expander 保持外觀統一)
 with st.sidebar.expander("📱 Telegram 測試推播"):
     if st.button("📤 發送測試訊息", use_container_width=True):
         success = send_telegram_alert("🔔 *這是一則來自金銀戰情室的手動測試推播！* 🚀")
@@ -359,7 +364,6 @@ with st.sidebar.expander("📱 Telegram 測試推播"):
         else:
             st.error("發送失敗，請檢查 Token 或 Chat ID。")
 
-# 2. 設定教學 (緊貼上一個 expander)
 with st.sidebar.expander("📖 Setup Telegram 設定？"):
     st.markdown("""
     **1. 建立 Telegram 機器人**
@@ -373,7 +377,6 @@ with st.sidebar.expander("📖 Setup Telegram 設定？"):
     * 搜尋您的 Bot Username，點擊 **`Start`** (發送 `/start`)
     """)
 
-# 3. 交易筆記 (將 text_area 收入內部，保持邊界乾淨)
 with st.sidebar.expander("📝 教戰手則 & 臨時筆記"):
     st.markdown("**【個人核心交易紀律】**")
     st.caption("1. 達極端溢價時避開 COMEX 空單\n2. GSR 突破門檻分批套利\n3. 嚴格執行止損")
@@ -386,7 +389,6 @@ with st.sidebar.expander("📝 教戰手則 & 臨時筆記"):
         on_change=update_note_cb
     )
     
-# --- 執行抓取 ---
 market_data, fetch_errors = fetch_market_data()
 
 if fetch_errors and market_data is None:
@@ -466,21 +468,18 @@ if market_data:
         f"*(註：此日期為系統推斷，如遇美國假日或特殊情況，官方實際發布日可能提前或順延)*"
     )
 
-    # --- 智慧防護與推播觸發機制 ---
     if "last_gsr_upper" not in st.session_state:
         st.session_state.last_gsr_upper = gsr_upper
     if "last_gsr_lower" not in st.session_state:
         st.session_state.last_gsr_lower = gsr_lower
     if "alert_sent_state" not in st.session_state:
-        st.session_state.alert_sent_state = None  # 記錄上一次發送的是哪一種警報
+        st.session_state.alert_sent_state = None
 
-    # 檢查：如果使用者手動調整了滑桿門檻，自動重置發送鎖定，允許再次報警！
     if gsr_upper != st.session_state.last_gsr_upper or gsr_lower != st.session_state.last_gsr_lower:
         st.session_state.alert_sent_state = None
         st.session_state.last_gsr_upper = gsr_upper
         st.session_state.last_gsr_lower = gsr_lower
 
-    # GSR 判斷與推播
     current_alert = None
     if market_data["gsr"] >= gsr_upper:
         msg = f"【GSR 警示】金銀比達 {market_data['gsr']}（>= {gsr_upper}）。白銀相對嚴重低估，建議考慮「賣金買銀」。「sell GOLD to buy SILVER」"
@@ -494,13 +493,11 @@ if market_data:
         st.info(f"【GSR 狀態】金銀比為 {market_data['gsr']}，目前位於中性區間。")
         current_alert = "neutral"
 
-    # 只有當「狀態改變」或是「剛好跨越門檻」時，才會發送一次 Telegram 推播，避免干擾
     if current_alert != st.session_state.alert_sent_state:
         if current_alert in ["gsr_high", "gsr_low"]:
             send_telegram_alert(f"🚨 *戰情室即時快訊* 🚨\n\n{msg}")
         st.session_state.alert_sent_state = current_alert
 
-    # 溢價判斷邏輯
     if st.session_state.sh_premium_val >= premium_upper:
         msg_p = f"【溢價警示】上海銀溢價達 {st.session_state.sh_premium_val}%！中國實體需求極強（>= {premium_upper}%），建議避開 COMEX 空單。"
         st.error(msg_p)
