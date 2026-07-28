@@ -33,12 +33,12 @@ def load_data():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if "trans_note" not in data: data["trans_note"] = ""
+                if "chat_history" not in data: data["chat_history"] = [] # 改用陣列儲存多則對話
                 if "trading_note" not in data: data["trading_note"] = ""
                 return data
         except Exception:
             pass
-    return {"sh_premium": 12.22, "trading_note": "", "trans_note": ""}
+    return {"sh_premium": 12.22, "trading_note": "", "chat_history": []}
 
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -128,22 +128,29 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["trading_note"] = text
     save_data(data)
     await update.message.reply_text(f"📝 *純文字筆記已更新：*\n\n`{text}`", parse_mode="Markdown")
-
-async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
+   async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     text = " ".join(context.args)
     if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/t hawkish FED`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/t hello friends`", parse_mode="Markdown")
         return
     try:
         src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', text) else 'auto'
         trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(text)
         trans_en = GoogleTranslator(source=src_lang, target='en').translate(text)
         trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(text)
-        final_note = f"【原文】{text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
+        final_msg = f"【原文】{text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
     except Exception:
-        final_note = f"【原文】{text}\n(⚠️ 翻譯失敗，僅保留原文)"
+        final_msg = f"【原文】{text}\n(⚠️ 翻譯失敗)"
     
+    data = load_data()
+    if "chat_history" not in data: data["chat_history"] = []
+    data["chat_history"].insert(0, final_msg)
+    data["chat_history"] = data["chat_history"][:20]
+    save_data(data)
+    
+    await update.message.reply_text(f"🌐 *新對話已加入聊天室！*\n\n`{final_msg}`", parse_mode="Markdown")
+       
     data = load_data()
     data["trans_note"] = final_note
     save_data(data)
@@ -366,6 +373,40 @@ if market_data:
     st.markdown("### 🚨 當日套利與轉置建議")
     today = datetime.now().date()
     st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
+# --- 放在主畫面最下方的「多語交流聊天室」 ---
+st.markdown("---")
+st.markdown("### 🌐 多語交流聊天室 (Chat & Translation Wall)")
+st.caption("在此輸入中文、英文或越南語，系統將自動同步翻譯並記錄對話，供跨國好友交流參考。")
 
+def add_chat_cb():
+    raw_text = st.session_state.get("new_chat_val", "")
+    if raw_text:
+        try:
+            src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', raw_text) else 'auto'
+            trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
+            trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
+            trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
+            formatted_msg = f"【原文】{raw_text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
+        except Exception:
+            formatted_msg = f"【原文】{raw_text}\n(⚠️ 翻譯失敗)"
+            
+        data = load_data()
+        if "chat_history" not in data: data["chat_history"] = []
+        data["chat_history"].insert(0, formatted_msg)
+        data["chat_history"] = data["chat_history"][:20]
+        save_data(data)
+        st.session_state.new_chat_val = ""
+
+st.text_input("💬 輸入想翻譯交流的新訊息：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入後按 Enter 發送...")
+
+# 渲染歷史對話牆
+data = load_data()
+chat_history = data.get("chat_history", [])
+if chat_history:
+    for chat in chat_history:
+        st.info(chat)
+else:
+    st.text("目前尚無對話紀錄，趕快輸入第一句話吧！")
+    
 st.divider()
-st.caption("僅供研究參考，不構成投資建議。")
+st.caption("以上僅供研究參考，不構成投資建議，各人造業各人擔。")
