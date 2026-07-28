@@ -96,15 +96,17 @@ async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id) != ALLOWED_CHAT_ID: return
-    text = " ".join(context.args)
-    if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/note 注意 CPI`", parse_mode="Markdown")
-        return
-    data = load_data()
-    data["trading_note"] = text
-    save_data(data)
-    st.session_state.trading_note_val = text
-    await update.message.reply_text(f"📝 戰術筆記已更新：\n\n`{text}`", parse_mode="Markdown")
+    # 範例處理邏輯 (python-telegram-bot / telebot)
+def handle_note(message):
+    text = message.text.replace('/note', '').strip()
+    if text:
+        # 1. 將 text 寫入檔案或資料庫 (Streamlit 讀取的地方)
+        save_to_database_or_file(text) 
+        
+        # 2. 必須給 Telegram 一個回應，否則聊天室會毫無反應
+        bot.reply_to(message, f"✅ 已成功記錄筆記：\n{text}")
+    else:
+        bot.reply_to(message, "⚠️ 請在 /note 後面加上文字，例如：`/note 今日觀望`")
 
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id) != ALLOWED_CHAT_ID: return
