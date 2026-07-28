@@ -129,20 +129,6 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     await update.message.reply_text(f"📝 *純文字筆記已更新：*\n\n`{text}`", parse_mode="Markdown")
    
-async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
-    text = " ".join(context.args)
-    if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/t hawkish FED`", parse_mode="Markdown")
-        return
-    try:
-        src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', text) else 'auto'
-        trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(text)
-        trans_en = GoogleTranslator(source=src_lang, target='en').translate(text)
-        trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(text)
-        final_msg = f"【原文】{text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
-    except Exception:
-        final_msg = f"【原文】{text}\n(⚠️ 翻譯失敗)"
     
     data = load_data()
     if "chat_history" not in data: data["chat_history"] = []
@@ -152,11 +138,7 @@ async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"🌐 *新對話已加入聊天室！*\n\n`{final_msg}`", parse_mode="Markdown")
        
-    data = load_data()
-    data["trans_note"] = final_note
-    save_data(data)
-    await update.message.reply_text(f"🌐 *多語翻譯已寫入！*\n\n`{final_note}`", parse_mode="Markdown")
-
+    
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
@@ -349,8 +331,7 @@ with st.sidebar.expander("📝 教戰手則 & 臨時筆記", expanded=True):
     st.caption("1. 達極端溢價時避開 COMEX 空單\n2. GSR 突破門檻分批套利\n3. 嚴格執行止損")
     st.markdown("---")
     st.text_area("✍️ 輸入臨時心得（純紀錄）：", height=100, key="trading_note_val", on_change=update_note_cb)
-    st.text_area("🌐 多語翻譯機（自動翻譯 中/英/越）：", height=150, key="trans_note_val", on_change=update_trans_cb)
-
+   
 market_data, fetch_errors = fetch_market_data()
 
 if fetch_errors and market_data is None:
@@ -374,10 +355,11 @@ if market_data:
     st.markdown("### 🚨 當日套利與轉置建議")
     today = datetime.now().date()
     st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
-# --- 放在主畫面最下方的「多語交流聊天室」 ---
+
+# --- 放在主畫面最下方的「多語交流聊天室 (正常聊天排序)」 ---
 st.markdown("---")
 st.markdown("### 🌐 多語交流聊天室 (Chat & Translation Wall)")
-st.caption("在此輸入中文、英文或越南語，系統將自動同步翻譯並記錄對話，供跨國好友交流參考。")
+st.caption("在此輸入中文、英文或越南語，系統將自動同步翻譯並記錄對話，最新訊息會顯示在最下方。")
 
 def add_chat_cb():
     raw_text = st.session_state.get("new_chat_val", "")
@@ -393,14 +375,20 @@ def add_chat_cb():
             
         data = load_data()
         if "chat_history" not in data: data["chat_history"] = []
-        data["chat_history"].insert(0, formatted_msg)
-        data["chat_history"] = data["chat_history"][:20]
+        
+        # 1. 用 append 放到清單最尾端（新訊息在下面）
+        data["chat_history"].append(formatted_msg)
+        
+        # 2. 如果超過 20 則，把最舊的那一筆（index 0）自動刪除
+        if len(data["chat_history"]) > 20:
+            data["chat_history"].pop(0)
+            
         save_data(data)
         st.session_state.new_chat_val = ""
 
 st.text_input("💬 輸入想翻譯交流的新訊息：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入後按 Enter 發送...")
 
-# 渲染歷史對話牆
+# 渲染歷史對話牆（依序由上到下顯示，最新在底部）
 data = load_data()
 chat_history = data.get("chat_history", [])
 if chat_history:
