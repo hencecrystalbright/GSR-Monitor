@@ -78,7 +78,7 @@ async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id) != ALLOWED_CHAT_ID: return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     if not context.args:
         await update.message.reply_text("⚠️ 請輸入數值，範例：`/p 12.35`", parse_mode="Markdown")
         return
@@ -95,21 +95,19 @@ async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ 請輸入有效的數字格式！")
 
 async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id) != ALLOWED_CHAT_ID: return
-    # 範例處理邏輯 (python-telegram-bot / telebot)
-def handle_note(message):
-    text = message.text.replace('/note', '').strip()
-    if text:
-        # 1. 將 text 寫入檔案或資料庫 (Streamlit 讀取的地方)
-        save_to_database_or_file(text) 
-        
-        # 2. 必須給 Telegram 一個回應，否則聊天室會毫無反應
-        bot.reply_to(message, f"✅ 已成功記錄筆記：\n{text}")
-    else:
-        bot.reply_to(message, "⚠️ 請在 /note 後面加上文字，例如：`/note 今日觀望`")
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    text = " ".join(context.args)
+    if not text:
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/note 注意 CPI`", parse_mode="Markdown")
+        return
+    data = load_data()
+    data["trading_note"] = text
+    save_data(data)
+    st.session_state.trading_note_val = text
+    await update.message.reply_text(f"📝 戰術筆記已更新：\n\n`{text}`", parse_mode="Markdown")
 
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id) != ALLOWED_CHAT_ID: return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     await update.message.reply_text(
         f"📊 *當前戰情室參數：*\n\n"
@@ -118,61 +116,23 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# --- Telegram 雙向控制 Bot (安全相容版) ---
-BOT_TOKEN = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU"
-ALLOWED_CHAT_ID = "5259644398"
+def run_bot_thread():
+    # 設定獨立的 Event Loop，避免 Streamlit 衝突
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
+    bot_app.add_handler(CommandHandler("start", tg_start))
+    bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
+    bot_app.add_handler(CommandHandler("note", tg_set_note))
+    bot_app.add_handler(CommandHandler("get", tg_get_status))
+    # 啟動接收，並丟棄重啟期間累積的舊訊息避免報錯
+    bot_app.run_polling(drop_pending_updates=True)
 
-# 使用 Global 鎖防止 Streamlit 重複拉起 polling 造成 409 Conflict
+# 啟動背景執行緒（只在伺服器啟動時執行一次）
 if "bot_thread_started" not in st.session_state:
-    st.session_state.bot_thread_started = False
+    st.session_state.bot_thread_started = True
+    threading.Thread(target=run_bot_thread, daemon=True).start()
 
-async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
-    await update.message.reply_text(
-        "🪙 *金銀戰情室控制台已連線！*\n\n"
-        "1. `/p 12.35`：更新溢價\n"
-        "2. `/note 內容`：更新筆記\n"
-        "3. `/get`：查詢當前設定",
-        parse_mode="Markdown"
-    )
-
-async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
-    if not context.args:
-        await update.message.reply_text("⚠️ 請輸入數值，例如：`/p 12.35`",從截圖可以非常精確地找出問題點所在：
-
-### 1. 為什麼 Telegram 機器人「完全沒有回應」（包括選單與 `/note`）？
-
-從 Telegram 截圖可以看到，你發送的指令（例如 `/start`、`/p 12.55%`、`/note test`）右下角都是 **「雙藍勾勾 (✔✔)」**。
-在 Telegram 機器人中，這代表**訊息已經成功發送到 Telegram 伺服器，但你的 Python 後端程式（Bot Server）根本沒有做出回應或回傳任何訊息**。
-
-**可能原因：**
-* **Webhook 設定跑掉，或是 Polling/Webhook 服務死掉**：如果程式崩潰或服務終止， Telegram 接收到訊息後傳給你的程式，你的程式沒有處理，Telegram 就不會回答。
-* **BotFather 選單沒有註冊成功**：左下角沒有「Menu」按鈕，代表向 `@BotFather` 設定 `setmycommands` 時沒有成功，或者選單指令清單是空的。
-
----
-
-### 2. 為什麼 Streamlit 網頁 App 沒有顯示 `/note test`？
-
-看 Streamlit 網頁截圖，左側「輸入臨時心得（自動記憶）：」下方顯示的內容，依然是固定的預設內容（1. 達極端溢價時... 2. GSR突破門檻...）。
-
-這代表：** Telegram 的指令根本沒有成功寫入你的資料庫 / 共享檔案（例如 JSON / DB / Environment / Github Repo）**。因為 Telegram Bot 端的程式沒有執行或出錯，資料傳遞在 Telegram 那關就卡住了，Streamlit 自然讀不到新資料。
-
----
-
-### 診斷與排查步驟
-
-請檢查你的 Telegram Bot 後端程式（或是部署平台如 Render, Railway, Fly.io 等）的 **Logs（執行日誌）**：
-
-#### 步驟一：向 `@BotFather` 強制註冊快捷菜單
-請在 Telegram 開啟 `@BotFather`，發送 `/setmycommands`，選擇你的 Bot，然後貼上以下內容（確保格式完全一致）：
-
-```text
-start - 顯示選單與系統狀態
-p - 更新中國銀溢價率 (例: /p 12.5)
-note - 寫入臨時心得記憶 (例: /note 今日觀望)
-get - 取得當前核心數據與筆記
-    
+   
 # --- Telegram 推播函數 ---
 def send_telegram_alert(message):
     bot_token = "8850511159:AAFygXc9GaX6Mhjry4y_57tfKXA13t5IilU"
