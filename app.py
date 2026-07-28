@@ -48,17 +48,33 @@ def update_premium_cb():
     save_data(data)
 
 def update_note_cb():
-    data = load_data()
-    data["trading_note"] = st.session_state.trading_note_val
-    save_data(data)
-
-saved_data = load_data()
-
-if "sh_premium_val" not in st.session_state:
-    st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
-
-if "trading_note_val" not in st.session_state:
-    st.session_state.trading_note_val = saved_data.get("trading_note", "")
+    raw_text = st.session_state.trading_note_val
+    
+    # 只要輸入框有字，且不是已經翻譯過的格式，就自動觸發翻譯
+    if raw_text and not raw_text.startswith("【原文】"):
+        try:
+            from deep_translator import GoogleTranslator
+            import re
+            
+            # 判斷是否包含中文字
+            src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', raw_text) else 'auto'
+            
+            trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
+            trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
+            trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
+            
+            final_note = f"【原文】{raw_text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
+        except Exception:
+            final_note = raw_text  # 若翻譯失敗則保留原字
+            
+        data = load_data()
+        data["trading_note"] = final_note
+        save_data(data)
+        st.session_state.trading_note_val = final_note
+    else:
+        data = load_data()
+        data["trading_note"] = raw_text
+        save_data(data)
 
 # --- Telegram 憑證：改用 st.secrets 讀取，不再寫死在程式碼裡 ---
 # 部署前請到 Streamlit Cloud → Manage app → Settings → Secrets 貼入：
