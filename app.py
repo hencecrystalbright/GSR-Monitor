@@ -128,11 +128,12 @@ async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["trading_note"] = text
     save_data(data)
     await update.message.reply_text(f"📝 *純文字筆記已更新：*\n\n`{text}`", parse_mode="Markdown")
-   async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
+   
+async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     text = " ".join(context.args)
     if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/t hello friends`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/t hawkish FED`", parse_mode="Markdown")
         return
     try:
         src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', text) else 'auto'
