@@ -33,10 +33,14 @@ def load_data():
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                # 確保舊檔案升級時，新欄位不會報錯
+                if "trans_note" not in data: data["trans_note"] = ""
+                if "trading_note" not in data: data["trading_note"] = ""
+                return data
         except Exception:
             pass
-    return {"sh_premium": 12.22, "trading_note": ""}
+    return {"sh_premium": 12.22, "trading_note": "", "trans_note": ""}
 
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -47,34 +51,45 @@ def update_premium_cb():
     data["sh_premium"] = st.session_state.sh_premium_val
     save_data(data)
 
+# --- 網頁端輸入框的回調函數 ---
 def update_note_cb():
-    raw_text = st.session_state.trading_note_val
-    
-    # 只要輸入框有字，且不是已經翻譯過的格式，就自動觸發翻譯
+    # 純筆記，直接存檔
+    data = load_data()
+    data["trading_note"] = st.session_state.trading_note_val
+    save_data(data)
+
+def update_trans_cb():
+    # 翻譯機，先翻譯再存檔
+    raw_text = st.session_state.trans_note_val
     if raw_text and not raw_text.startswith("【原文】"):
         try:
             from deep_translator import GoogleTranslator
             import re
             
-            # 判斷是否包含中文字
             src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', raw_text) else 'auto'
-            
             trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
             trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
             trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
             
             final_note = f"【原文】{raw_text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
         except Exception:
-            final_note = raw_text  # 若翻譯失敗則保留原字
+            final_note = f"【原文】{raw_text}\n(⚠️ 翻譯失敗，僅保留原文)"
             
         data = load_data()
-        data["trading_note"] = final_note
+        data["trans_note"] = final_note
         save_data(data)
-        st.session_state.trading_note_val = final_note
+        st.session_state.trans_note_val = final_note
     else:
+        # 如果已經是翻譯好的格式（或被清空），直接存檔不再重複翻
         data = load_data()
-        data["trading_note"] = raw_text
+        data["trans_note"] = raw_text
         save_data(data)
+
+# 初始化載入
+saved_data = load_data()
+if "sh_premium_val" not in st.session_state: st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
+if "trading_note_val" not in st.session_state: st.session_state.trading_note_val = saved_data.get("trading_note", "")
+if "trans_note_val" not in st.session_state: st.session_state.trans_note_val = saved_data.get("trans_note", "")
 
 # --- Telegram 憑證：改用 st.secrets 讀取，不再寫死在程式碼裡 ---
 # 部署前請到 Streamlit Cloud → Manage app → Settings → Secrets 貼入：
@@ -90,79 +105,67 @@ except Exception:
     st.sidebar.error("⚠️ 尚未設定 Telegram Secrets，推播與雙向控制功能停用。請至 App 設定新增 BOT_TOKEN / ALLOWED_CHAT_ID。")
 
 async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): 
-        return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     await update.message.reply_text(
         "🪙 *金銀戰情室控制台已連線！*\n\n"
         "指令列表：\n"
         "1. `/p 12.35` ：更新溢價\n"
-        "2. `/note 內容` ：更新筆記\n"
-        "3. `/get` ：查詢當前設定",
+        "2. `/note 內容` ：新增純文字筆記\n"
+        "3. `/trans 內容` ：多國語言自動翻譯\n"
+        "4. `/get` ：查詢當前設定",
         parse_mode="Markdown"
     )
 
-async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
-    if not context.args:
-        await update.message.reply_text("⚠️ 請輸入數值，範例：`/p 12.35`", parse_mode="Markdown")
-        return
-    try:
-        raw_val = context.args[0].replace("%", "")
-        val = float(raw_val)
-        
-        # 1. 僅讀寫 JSON，絕對不碰 st.session_state
-        data = load_data()
-        data["sh_premium"] = val
-        save_data(data)
-        
-        await update.message.reply_text(f"✅ 上海銀溢價已更新為：*{val}%*\n_(請重新整理 Streamlit 網頁以載入最新數據)_", parse_mode="Markdown")
-    except ValueError:
-        await update.message.reply_text("❌ 請輸入有效的數字格式！")
-
 async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 純文字筆記
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     text = " ".join(context.args)
     if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/note hawkish FED`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/note 今天不交易`", parse_mode="Markdown")
+        return
+        
+    data = load_data()
+    data["trading_note"] = text
+    save_data(data)
+    
+    await update.message.reply_text(f"📝 *純文字筆記已更新：*\n\n`{text}`\n\n_(請重新整理 Streamlit 網頁查看)_", parse_mode="Markdown")
+
+async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 翻譯機
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    text = " ".join(context.args)
+    if not text:
+        await update.message.reply_text("⚠️ 請輸入內容，範例：`/trans hawkish FED`", parse_mode="Markdown")
         return
         
     try:
         from deep_translator import GoogleTranslator
-        import re  # 匯入正則表達式模組，用來偵測文字特徵
-        
-        # 💡 智慧語系偵測：解決 Google 翻譯對「超短中文」判斷失效的 Bug
-        # 只要字串裡包含任何一個中文字 (Unicode 範圍)，就強制指定來源為中文
-        if re.search(r'[\u4e00-\u9fa5]', text):
-            src_lang = 'zh-TW'
-        else:
-            src_lang = 'auto'
-            
+        import re
+        src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', text) else 'auto'
         try:
-            # 使用我們判定好的 src_lang 來取代原本的 'auto'
             trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(text)
             trans_en = GoogleTranslator(source=src_lang, target='en').translate(text)
             trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(text)
             final_note = f"【原文】{text}\n【中】{trans_zh}\n【EN】{trans_en}\n【VN】{trans_vi}"
-        except Exception as e:
+        except Exception:
             final_note = f"【原文】{text}\n(⚠️ 翻譯 API 暫時阻擋，僅儲存原文)"
         
-        # 存檔並回傳
         data = load_data()
-        data["trading_note"] = final_note
+        data["trans_note"] = final_note
         save_data(data)
         
-        await update.message.reply_text(f"📝 *筆記已寫入！*\n\n`{final_note}`\n\n_(請重新整理 Streamlit 網頁查看)_", parse_mode="Markdown")
-        
+        await update.message.reply_text(f"🌐 *多語翻譯已寫入！*\n\n`{final_note}`\n\n_(請重新整理 Streamlit 網頁查看)_", parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ 存檔失敗：{e}")
-        
+
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     await update.message.reply_text(
         f"📊 *當前戰情室參數：*\n\n"
-        f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n"
-        f"📝 交易筆記：\n`{data.get('trading_note')}`",
+        f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n\n"
+        f"📝 純文字筆記：\n`{data.get('trading_note')}`\n\n"
+        f"🌐 翻譯紀錄：\n`{data.get('trans_note')}`",
         parse_mode="Markdown"
     )
 
@@ -172,8 +175,9 @@ def run_bot_thread():
     try:
         bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
         bot_app.add_handler(CommandHandler("start", tg_start))
-        bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium))
-        bot_app.add_handler(CommandHandler("note", tg_set_note))
+        bot_app.add_handler(CommandHandler(["p", "premium"], tg_set_premium)) #溢價(支援 /p 或 /premium)
+        bot_app.add_handler(CommandHandler(["n", "note"], tg_set_note))       # 純筆記(支援 /n 或 /note)
+        bot_app.add_handler(CommandHandler(["t", "trans"], tg_set_trans)) # 翻譯機 (支援 /t 或 /trans)
         bot_app.add_handler(CommandHandler("get", tg_get_status))
         # 關鍵修正：stop_signals=None
         # run_polling() 預設會嘗試註冊 SIGINT/SIGTERM 訊號處理器，
@@ -421,16 +425,27 @@ with st.sidebar.expander("📖 Setup Telegram 設定？"):
     * 搜尋您的 Bot Username，點擊 **`Start`** (發送 `/start`)
     """)
 
-with st.sidebar.expander("📝 教戰手則 & 臨時筆記"):
+with st.sidebar.expander("📝 教戰手則 & 臨時筆記", expanded=True):
     st.markdown("**【個人核心交易紀律】**")
     st.caption("1. 達極端溢價時避開 COMEX 空單\n2. GSR 突破門檻分批套利\n3. 嚴格執行止損")
     st.markdown("---")
-    user_note = st.text_area(
-        "輸入臨時心得（自動記憶）：",
-        height=120,
+    
+    # 框 1：純筆記
+    st.text_area(
+        "✍️ 輸入臨時心得（純紀錄）：",
+        height=100,
         placeholder="例如：美盤開盤注意 CPI 數據...",
         key="trading_note_val",
         on_change=update_note_cb
+    )
+    
+    # 框 2：翻譯機
+    st.text_area(
+        "🌐 多語翻譯機（自動翻譯 中/英/越）：",
+        height=150,
+        placeholder="輸入欲翻譯的文字...",
+        key="trans_note_val",
+        on_change=update_trans_cb
     )
     
 market_data, fetch_errors = fetch_market_data()
