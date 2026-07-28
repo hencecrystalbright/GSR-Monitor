@@ -29,21 +29,31 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 DATA_FILE = "data.json"
 
 def load_data():
+    # 預設基準值
+    default_data = {"sh_premium": 12.22, "trading_note": "", "chat_history": []}
+    
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
+                # 確保欄位完整，若缺少的補上預設格式但不破壞現有資料
                 if "chat_history" not in data: data["chat_history"] = []
                 if "trading_note" not in data: data["trading_note"] = ""
+                if "sh_premium" not in data: data["sh_premium"] = 12.22
                 return data
         except Exception:
             pass
-    return {"sh_premium": 12.22, "trading_note": "", "chat_history": []}
+            
+    # 如果檔案不存在，才建立並寫入預設值
+    save_data(default_data)
+    return default_data
 
 def save_data(data):
+    # 💡 防護網：絕對不允許儲存空的或格式錯誤的資料把歷史洗掉
+    if not isinstance(data, dict):
+        return
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 def update_premium_cb():
     data = load_data()
     data["sh_premium"] = st.session_state.sh_premium_val
