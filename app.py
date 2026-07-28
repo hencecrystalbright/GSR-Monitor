@@ -346,18 +346,18 @@ st.sidebar.header("🛠️ 工具與線上記事本")
 with st.sidebar.expander("📝 核心紀律 & 臨時心得牆", expanded=True):
     st.markdown("**【個人線上記事本 (上限10則)】**")
     
-    # 動態渲染記事本歷史
     current_data = load_data()
     notes = current_data.get("notes_history", [])
     if notes:
         for idx, note_text in enumerate(notes, 1):
-            st.markdown(f"{idx}. {note_text}")
+            # 💡 自動清洗：如果文字本身已經帶有數字編號（例如 "1. " 或 "1."），我們把它過濾掉，避免雙重編號
+            clean_text = re.sub(r'^\d+[\.\、]\s*', '', note_text)
+            st.markdown(f"**{idx}.** {clean_text}")
     else:
         st.caption("目前無記事紀錄")
         
     st.markdown("---")
     
-    # 💡 改用 text_input，按 Enter 就能立刻存入上方記事本
     def add_note_cb():
         raw_text = st.session_state.get("trading_note_val", "")
         if raw_text:
