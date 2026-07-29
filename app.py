@@ -14,7 +14,7 @@ from deep_translator import GoogleTranslator
 import re
 
 st.set_page_config(
-    page_title="Q3_貴金屬總表.xlsx - Excel", page_icon="📗", layout="wide"
+    page_title="Q3_metal data.xlsx - Excel", page_icon="📗", layout="wide"
 )
 
 # ============================================================
