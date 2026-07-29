@@ -25,7 +25,7 @@ st.markdown(
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Calibri&family=Segoe+UI&display=swap');
 
-    /* 隱藏 Streamlit 原生元素 */
+    /* 隱藏 Streamlit 原生 Header 與 Footer */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header[data-testid="stHeader"] {background: transparent;}
@@ -75,42 +75,26 @@ st.markdown(
     }
 
     /* ---------------------------------------------------- */
-    /* 🎯 1. Dashboard Alert / Highlight 背景 (淡藍色底)    */
+    /* 🎯 全局 Alert (st.info, st.warning, st.success) 統一色彩 */
+    /* 讓 GSR/溢價建議 與 下方 0.618 區塊 顏色 100% 完全一致   */
     /* ---------------------------------------------------- */
-    div[data-testid="stAlert"], .stAlert {
-        background-color: #E8F4F8 !important;  /* 淡藍色底 */
-        color: #1A4958 !important;             /* 深藍灰文字 */
-        border: 1px solid #BEE3F8 !important;   /* 淡藍邊框 */
+    div[data-testid="stAlert"], .stAlert, 
+    div[data-testid="stAlert"] > div,
+    div[data-baseweb="notification"] {
+        background-color: #E8F4F8 !important;  /* 統一淡藍色底 */
+        color: #1A4958 !important;             /* 統一深藍灰文字 */
+        border: 1px solid #BEE3F8 !important;   /* 統一淡藍邊框 */
         border-radius: 4px !important;
     }
+    
+    /* 內嵌所有 SVG 圖示與 Markdown 文字顏色強制統一 */
+    div[data-testid="stAlert"] p, 
+    div[data-testid="stAlert"] span,
+    div[data-testid="stAlert"] label {
+        color: #1A4958 !important;
+    }
     div[data-testid="stAlert"] svg {
-        fill: #2B6CB0 !important;              /* 圖示沉穩藍 */
-    }
-
-    /* ---------------------------------------------------- */
-    /* 🎯 2. 全域 Slider 變色修復 (墨綠色滑桿 / 黑色文字)  */
-    /* ---------------------------------------------------- */
-    /* 強制修改底層進度條與拖曳圓點為墨綠色 */
-    div[data-testid="stSlider"] [role="slider"] {
-        background-color: #217346 !important;
-        border-color: #217346 !important;
-        box-shadow: none !important;
-    }
-    div[data-testid="stSlider"] [data-baseweb="slider"] div {
-        background-color: #217346 !important;
-    }
-    /* 恢復上軌道/未選取部分的淡灰色 */
-    div[data-testid="stSlider"] [data-baseweb="slider"] > div > div:first-child {
-        background-color: #D4D4D4 !important;
-    }
-
-    /* 滑桿文字與數字標籤保持深灰色 */
-    div[data-testid="stSlider"] label,
-    div[data-testid="stSlider"] label p,
-    div[data-testid="stSlider"] [data-testid="stMarkdownContainer"] p,
-    div[data-testid="stSlider"] div[aria-hidden="true"] {
-        color: #333333 !important;
-        font-weight: 500 !important;
+        fill: #2B6CB0 !important;              /* 統一圖示顏色 */
     }
 
     /* Excel 儲存格網格 table 樣式 */
@@ -706,20 +690,20 @@ if market_data:
         st.markdown("**📊 GSR 跨金屬套利建議**")
         if current_gsr:
             if current_gsr >= gsr_upper:
-                st.warning(
+                st.info(
                     f"🚨 **GSR 目前為 {current_gsr}（≥ 門檻 {gsr_upper}）**：\n"
                     "白銀相對黃金**嚴重低估**！操作建議：**【賣金買銀 /"
                     " 多銀空金】**，博取金銀比均值回歸。"
                 )
             elif current_gsr <= gsr_lower:
-                st.warning(
+                st.info(
                     f"🚨 **GSR 目前為 {current_gsr}（≤ 門檻 {gsr_lower}）**：\n"
                     "白銀相對黃金**顯著高估**！操作建議：**【賣銀買金 /"
                     " 多金空銀】**，防範白銀補跌風險。"
                 )
             else:
-                st.success(
-                    f"✅ **GSR 目前為 {current_gsr}**（介於設定門檻 {gsr_lower} ~"
+                st.info(
+                    f"☑️ **GSR 目前為 {current_gsr}**（介於設定門檻 {gsr_lower} ~"
                     f" {gsr_upper} 之間）：\n"
                     "金銀比處於**合理中性區間**，建議保持不動，觀察波段趨勢。"
                 )
@@ -729,7 +713,7 @@ if market_data:
     with c_prem_strat:
         st.markdown("**🇨🇳 上海銀 Premium 溢價建議**")
         if current_prem >= premium_upper:
-            st.warning(
+            st.info(
                 f"🚨 **上海銀溢價達 {current_prem}%（≥ 門檻"
                 f" {premium_upper}%）**：\n"
                 "國內需求極度高企或流動性緊縮，極端溢價警示，留意回吐修正。"
@@ -741,8 +725,8 @@ if market_data:
                 "國內外價差收斂，市場情緒平穩，適合佈局長線價差套利。"
             )
         else:
-            st.success(
-                f"✅ **上海銀溢價為 {current_prem}%**：處於正常溢價區間"
+            st.info(
+                f"☑️ **上海銀溢價為 {current_prem}%**：處於正常溢價區間"
                 f"（{premium_lower}% ~ {premium_upper}%）。"
             )
 
@@ -770,16 +754,16 @@ if market_data:
             st.write(f"• **0.618 關鍵壓力：** `${ag_fib_res}`")
 
             if ag_spot <= ag_fib_sup:
-                st.warning(
+                st.info(
                     "⚠️ 現價低於 0.618 支撐位：短線有超跌反彈機會，可留意多頭套利。"
                 )
             elif ag_spot >= ag_fib_res:
-                st.warning(
+                st.info(
                     "⚠️ 現價高於 0.618"
                     " 壓力位：短線進入強勢衝高區，注意上方獲利回吐賣壓。"
                 )
             else:
-                st.success("✅ 現價處於 0.618 費波那契合理波段區間。")
+                st.info("☑️ 現價處於 0.618 費波那契合理波段區間。")
         else:
             st.caption("白銀 5日波段歷史資料計算中...")
 
@@ -800,15 +784,15 @@ if market_data:
             st.write(f"• **0.618 關鍵壓力：** `${au_fib_res}`")
 
             if au_spot <= au_fib_sup:
-                st.warning(
+                st.info(
                     "⚠️ 現價低於 0.618 支撐位：黃金短線回檔至黃金分割低位。"
                 )
             elif au_spot >= au_fib_res:
-                st.warning(
+                st.info(
                     "⚠️ 現價高於 0.618 壓力位：黃金短線逼近波段壓力位。"
                 )
             else:
-                st.success("✅ 現價處於 0.618 費波那契合理波段區間。")
+                st.info("☑️ 現價處於 0.618 費波那契合理波段區間。")
         else:
             st.caption("黃金 5日波段歷史資料計算中...")
 
