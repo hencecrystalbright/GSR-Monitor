@@ -683,12 +683,12 @@ if market_data:
     current_gsr = market_data.get("gsr")
     current_prem = st.session_state.sh_premium_val
 
-    st.markdown("#### ⚖️ GSR 金銀比與套利策略建議")
+    st.markdown("#### ⚖️ GSR Strategy")
 
     c_gsr_strat, c_prem_strat = st.columns(2)
 
     with c_gsr_strat:
-        st.markdown("**📊 GSR 跨金屬套利建議**")
+        st.markdown("**📊 GSR metal comments**")
         if current_gsr:
             if current_gsr >= gsr_upper:
                 st.info(
@@ -734,7 +734,7 @@ if market_data:
     st.markdown("---")
 
     # --- 📐 2. 0.618 費波那契波段分析 ---
-    st.markdown("#### 📐 5日波段與 0.618 黃金分割延伸位")
+    st.markdown("#### 📐 Swing and the 0.618 Fibonacci extension level")
 
     col_ag, col_au = st.columns(2)
 
@@ -744,7 +744,7 @@ if market_data:
     ag_low = market_data.get("silver_low")
 
     with col_ag:
-        st.markdown("**🥈 白銀 (Silver) 5日區間與 0.618**")
+        st.markdown("**🥈 Silver 5-day range and 0.618**")
         if ag_spot and ag_high and ag_low and ag_high > ag_low:
             ag_diff = ag_high - ag_low
             ag_fib_sup = round(ag_high - (ag_diff * 0.618), 2)
@@ -774,7 +774,7 @@ if market_data:
     au_low = market_data.get("gold_low")
 
     with col_au:
-        st.markdown("**🥇 黃金 (Gold) 5日區間與 0.618**")
+        st.markdown("**🥇 Gold 5-day range and 0.618**")
         if au_spot and au_high and au_low and au_high > au_low:
             au_diff = au_high - au_low
             au_fib_sup = round(au_high - (au_diff * 0.618), 1)
