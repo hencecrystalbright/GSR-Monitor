@@ -35,6 +35,7 @@ DATA_FILE = "data.json"  # 僅作為「尚未設定 JSONBin 時」的本機備�
 # 請至 Streamlit Cloud → Manage app → Settings → Secrets 設定：
 #   JSONBIN_API_KEY = "你的 X-Master-Key"
 #   JSONBIN_BIN_ID  = "你的 Bin ID"
+#   JSONBin.io 免費版每日提供約 10,000 次 API 請求限制
 JSONBIN_API_KEY = st.secrets.get("JSONBIN_API_KEY", None)
 JSONBIN_BIN_ID = st.secrets.get("JSONBIN_BIN_ID", None)
 JSONBIN_URL = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}" if JSONBIN_BIN_ID else None
@@ -410,7 +411,7 @@ with st.sidebar.expander("📝 臨時心得牆", expanded=True):
         st.caption("目前尚無記事紀錄")
         
     st.markdown("---")
-    st.text_input("✍️ 新增臨時心得：", key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Enter 儲存...")
+    st.text_input("✍️ 臨時心得上限10000/日：", key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Enter 儲存...")
 
 st.sidebar.markdown("---")
 st.sidebar.header("📱 Telegram 測試與連線")
