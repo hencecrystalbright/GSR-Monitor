@@ -1,60 +1,167 @@
-import threading
 import asyncio
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-
-import streamlit as st
-import pandas as pd
-import requests
-from datetime import datetime, date
 import calendar
 import json
 import os
-from deep_translator import GoogleTranslator
 import re
+import threading
+from datetime import date, datetime
 
+from deep_translator import GoogleTranslator
+import pandas as pd
+import requests
+import streamlit as st
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
+# ==========================================
+# 1. 頁面配置與 Excel 隱蔽式 CSS 注入
+# ==========================================
 st.set_page_config(
-    page_title="金銀市場與套利監測(自動化版)", page_icon="🪙", layout="centered"
+    page_title="Financial_Data_Sheet_v2.4.xlsx",  # 偽裝成 Excel 檔名
+    page_icon="📊",
+    layout="wide",  # 寬螢幕模式更像試算表
+    initial_sidebar_state="expanded",
 )
 
+# 注入 Excel 經典風格 CSS
+excel_css = """
+<style>
+    /* 全局背景與字體 */
+    .stApp {
+        background-color: #F3F2F1 !important;
+        font-family: "Segoe UI", "Calibri", "Microsoft JhengHei", sans-serif !important;
+        color: #323130 !important;
+    }
+    
+    /* 頂部 Header 偽裝成 Excel Ribbon 標頭 */
+    header[data-testid="stHeader"] {
+        background-color: #107C41 !important;
+        height: 2.8rem;
+    }
+    header[data-testid="stHeader"] * {
+        color: white !important;
+    }
+
+    /* 主標題樣式：Excel 工作表頂部風格 */
+    .excel-title-bar {
+        background-color: #107C41;
+        color: white;
+        padding: 8px 16px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 2px 2px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    /* 欄位/資料邊框：模擬 Excel 儲存格 (Grid) */
+    div[data-testid="stMetric"], .stMarkdown div[data-testid="stBlock"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #D1D1D1 !important;
+        padding: 8px 12px !important;
+        border-radius: 0px !important; /* 取消圓角 */
+        box-shadow: none !important;
+    }
+    
+    /* Metric 數值與標籤優化 */
+    div[data-testid="stMetricLabel"] {
+        font-size: 11px !important;
+        color: #605E5C !important;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 18px !important;
+        font-family: "Consolas", "Courier New", monospace !important;
+        color: #201F1E !important;
+        font-weight: bold;
+    }
+
+    /* 側邊欄：模擬 Excel 側邊參數與任務窗格 */
+    section[data-testid="stSidebar"] {
+        background-color: #EAE8E8 !important;
+        border-right: 1px solid #C8C6C4 !important;
+    }
+    
+    /* 容器邊框實心化（留言板與記事本） */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        border: 1px solid #C8C6C4 !important;
+        border-radius: 0px !important;
+        background-color: #FFFFFF !important;
+    }
+
+    /* 按鈕樣式：微軟軟體經典按鈕 */
+    .stButton > button {
+        background-color: #FFFFFF !important;
+        color: #323130 !important;
+        border: 1px solid #8A8886 !important;
+        border-radius: 2px !important;
+        font-size: 12px !important;
+        padding: 2px 10px !important;
+    }
+    .stButton > button:hover {
+        background-color: #EDEBE9 !important;
+        border-color: #107C41 !important;
+        color: #107C41 !important;
+    }
+
+    /* 輸入框樣式 */
+    .stTextInput input, .stNumberInput input {
+        border: 1px solid #8A8886 !important;
+        border-radius: 0px !important;
+        font-family: "Consolas", monospace !important;
+        font-size: 13px !important;
+        background-color: #FFFFFF !important;
+    }
+    
+    /* 隱藏 Streamlit 原生頁尾浮點 */
+    footer {visibility: hidden;}
+</style>
+"""
+st.markdown(excel_css, unsafe_allow_html=True)
+
+# ==========================================
+# 2. 標題與假 UI 偽裝（式樣欄 / Formula Bar）
+# ==========================================
 st.markdown(
-    "<h1>🪙 每日金銀市場與套利監測<br>"
-    "<span style='font-size: 0.55em; color: grey;'>Daily Gold & Silver Market and Monitor</span></h1>", 
-    unsafe_allow_html=True
+    """
+    <div class="excel-title-bar">
+        <span>📊 Workbook1.xlsx - Sheet1 [Market_Data_Summary]</span>
+        <span style="font-size: 11px; opacity: 0.8;">AutoSave: ON | User: Analyst</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
-st.caption("數據來源：gold-api.com（現貨）10/m＋ Frankfurter（DXY）1/3m＋ CoinGecko（RSI/5日波段）1/10m")
-st.markdown("---")
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
-DATA_FILE = "data.json"  # 僅作為「尚未設定 JSONBin 時」的本機備援，重開機會遺失，不建議長期依賴
+DATA_FILE = "data.json"
 
-# --- 持久化儲存：改用 JSONBin.io 雲端 JSON 儲存，取代不可靠的本機檔案 ---
-# Streamlit Community Cloud 的容器本機硬碟並非永久保存，容器一旦被重建
-# （休眠喚醒、重新部署、平台資源回收）本機檔案就會消失，導致 sh_premium/notes/chat
-# 全部被打回預設值。改存到容器外部的 JSONBin.io，才不會受容器重建影響。
-# 請至 Streamlit Cloud → Manage app → Settings → Secrets 設定：
-#   JSONBIN_API_KEY = "你的 X-Master-Key"
-#   JSONBIN_BIN_ID  = "你的 Bin ID"
-#   JSONBin.io 免費版每日提供約 10,000 次 API 請求限制
+# --- 持久化儲存 logic ---
 JSONBIN_API_KEY = st.secrets.get("JSONBIN_API_KEY", None)
 JSONBIN_BIN_ID = st.secrets.get("JSONBIN_BIN_ID", None)
-JSONBIN_URL = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}" if JSONBIN_BIN_ID else None
+JSONBIN_URL = (
+    f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}" if JSONBIN_BIN_ID else None
+)
 PERSIST_ENABLED = bool(JSONBIN_URL and JSONBIN_API_KEY)
 
 if not PERSIST_ENABLED:
-    st.sidebar.warning(
-        "⚠️ 尚未設定 JSONBin 雲端儲存（JSONBIN_API_KEY / JSONBIN_BIN_ID）。"
-        "目前資料僅寫在容器本機，App 休眠喚醒或重新部署後會被重置為預設值。"
-    )
+    st.sidebar.warning("⚠️ JSONBin 未連結 (本機暫存模式)")
+
 
 def _default_data():
     return {"sh_premium": 12.22, "notes_history": [], "chat_history": []}
 
+
 def _normalize(data):
-    if "chat_history" not in data: data["chat_history"] = []
-    if "notes_history" not in data: data["notes_history"] = []
-    if "sh_premium" not in data: data["sh_premium"] = 12.22
+    if "chat_history" not in data:
+        data["chat_history"] = []
+    if "notes_history" not in data:
+        data["notes_history"] = []
+    if "sh_premium" not in data:
+        data["sh_premium"] = 12.22
     return data
+
 
 def load_data():
     if PERSIST_ENABLED:
@@ -74,7 +181,6 @@ def load_data():
             print(f"[JSONBin load error] {e}")
             return _default_data()
 
-    # 本機備援（尚未設定 JSONBin 時使用，重開機/容器重建會遺失，僅供測試）
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -84,6 +190,7 @@ def load_data():
     default_data = _default_data()
     save_data(default_data)
     return default_data
+
 
 def save_data(data):
     if not isinstance(data, dict):
@@ -103,26 +210,28 @@ def save_data(data):
             print(f"[JSONBin save error] {e}")
         return
 
-    # 本機備援
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 def update_premium_cb():
     data = load_data()
     data["sh_premium"] = st.session_state.sh_premium_val
     save_data(data)
 
-# 網頁端新增筆記回調（最多保留 10 則，先進先出）
+
 def update_note_cb():
     raw_text = st.session_state.get("trading_note_val", "")
     if raw_text.strip():
         data = load_data()
-        if "notes_history" not in data: data["notes_history"] = []
+        if "notes_history" not in data:
+            data["notes_history"] = []
         data["notes_history"].append(raw_text.strip())
         if len(data["notes_history"]) > 10:
             data["notes_history"].pop(0)
         save_data(data)
         st.session_state.trading_note_val = ""
+
 
 saved_data = load_data()
 st.session_state.sh_premium_val = saved_data.get("sh_premium", 12.22)
@@ -133,108 +242,117 @@ try:
 except Exception:
     BOT_TOKEN = None
     ALLOWED_CHAT_ID = None
-    st.sidebar.error("⚠️ 尚未設定 Telegram Secrets，推播與雙向控制功能停用。")
+
 
 def send_telegram_alert(message):
-    if not BOT_TOKEN or not ALLOWED_CHAT_ID: return False
+    if not BOT_TOKEN or not ALLOWED_CHAT_ID:
+        return False
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
-        r = requests.post(url, json={"chat_id": ALLOWED_CHAT_ID, "text": message}, timeout=10)
+        r = requests.post(
+            url, json={"chat_id": ALLOWED_CHAT_ID, "text": message}, timeout=10
+        )
         return r.status_code == 200
     except Exception:
         return False
 
+
 # --- Telegram 機器人非同步控制函數 ---
 async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip():
+        return
     await update.message.reply_text(
-        "🪙 *金銀戰情室控制台已連線！*\n\n"
-        "指令列表：\n"
-        "1. `/p 12.35` ：更新溢價\n"
-        "2. `/n 筆記內容` ：新增記事本心得 (最多10則)\n"
-        "3. `/t 翻譯內容` ：多語自動翻譯並寫入留言板\n"
-        "4. `/get` ：查詢當前設定與近期資料",
-        parse_mode="Markdown"
+        "📊 *Data Console Connected*\n\n"
+        "Commands:\n"
+        "1. `/p 12.35` : Update Premium\n"
+        "2. `/n Note` : Add memo\n"
+        "3. `/t Text` : Translate & Post\n"
+        "4. `/get` : Query Status",
+        parse_mode="Markdown",
     )
 
+
 async def tg_set_premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip():
+        return
     if not context.args:
-        await update.message.reply_text("⚠️ 請輸入數值，範例：`/p 12.35`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ Format error: `/p 12.35`")
         return
     try:
-        raw_val = context.args[0].replace("%", "")
-        val = float(raw_val)
+        val = float(context.args[0].replace("%", ""))
         data = load_data()
         data["sh_premium"] = val
         save_data(data)
-        await update.message.reply_text(f"✅ 上海銀溢價已更新為：*{val}%*", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ Premium Updated: *{val}%*")
     except ValueError:
-        await update.message.reply_text("❌ 請輸入有效的數字格式！")
+        await update.message.reply_text("❌ Invalid number format!")
+
 
 async def tg_set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip():
+        return
     text = " ".join(context.args)
     if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/n 注意美盤開盤`", parse_mode="Markdown")
         return
-    
     data = load_data()
-    if "notes_history" not in data: data["notes_history"] = []
+    if "notes_history" not in data:
+        data["notes_history"] = []
     data["notes_history"].append(text)
     if len(data["notes_history"]) > 10:
         data["notes_history"].pop(0)
     save_data(data)
-    
-    await update.message.reply_text(f"📝 *線上記事本已新增：*\n\n`{text}`\n*(目前共存 {len(data['notes_history'])} 則，上限10則)*", parse_mode="Markdown")
+    await update.message.reply_text(f"📝 Memo logged: `{text}`")
+
 
 async def tg_set_trans(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip():
+        return
     text = " ".join(context.args)
     if not text:
-        await update.message.reply_text("⚠️ 請輸入內容，範例：`/t hawkish FED`", parse_mode="Markdown")
         return
     try:
-        src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', text) else 'auto'
-        trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(text)
-        trans_en = GoogleTranslator(source=src_lang, target='en').translate(text)
-        trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(text)
-        
+        src_lang = "zh-TW" if re.search(r"[\u4e00-\u9fa5]", text) else "auto"
+        trans_zh = GoogleTranslator(source=src_lang, target="zh-TW").translate(
+            text
+        )
+        trans_en = GoogleTranslator(source=src_lang, target="en").translate(text)
+        trans_vi = GoogleTranslator(source=src_lang, target="vi").translate(text)
         final_msg = f"🇬🇧 {trans_en}\n\n🇨🇳 {trans_zh} ｜ 🇻🇳 {trans_vi}"
     except Exception:
-        final_msg = f"🇬🇧 {text}\n\n*(⚠️ 翻譯失敗)*"
-    
+        final_msg = f"🇬🇧 {text}\n\n*(⚠️ Translation Error)*"
+
     data = load_data()
-    if "chat_history" not in data: data["chat_history"] = []
+    if "chat_history" not in data:
+        data["chat_history"] = []
     data["chat_history"].append(final_msg)
     if len(data["chat_history"]) > 20:
         data["chat_history"].pop(0)
     save_data(data)
-    
-    await update.message.reply_text(f"🌐 *新對話已同步加入留言板！*\n\n{final_msg}", parse_mode="Markdown")
+    await update.message.reply_text(f"🌐 Message synchronized!\n\n{final_msg}")
+
 
 async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
+    if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip():
+        return
     data = load_data()
-    
     notes = [n for n in data.get("notes_history", []) if n.strip()]
-    notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)]) if notes else "目前無筆記"
-    
-    history = data.get("chat_history", [])
-    chat_str = "\n\n---\n\n".join(history[-3:]) if history else "目前無對話"
-    
+    notes_str = (
+        "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)])
+        if notes
+        else "None"
+    )
     await update.message.reply_text(
-        f"📊 *當前戰情室參數：*\n\n"
-        f"🇨🇳 上海銀溢價：`{data.get('sh_premium')}%`\n\n"
-        f"📝 *線上記事本 (近期筆記)：*\n{notes_str}\n\n"
-        f"🌐 *最近留言板 (最後3則)：*\n{chat_str}",
-        parse_mode="Markdown"
+        f"📊 *Current Metrics:*\n\n"
+        f"SH Premium: `{data.get('sh_premium')}%`\n\n"
+        f"📝 *Memos:*\n{notes_str}"
     )
 
-# --- 常駐背景 Bot 啟動器 ---
+
 @st.cache_resource
 def init_telegram_bot(token):
-    if not token: return
+    if not token:
+        return
+
     def run():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -252,8 +370,10 @@ def init_telegram_bot(token):
     t = threading.Thread(target=run, daemon=True)
     t.start()
 
+
 if BOT_TOKEN:
     init_telegram_bot(BOT_TOKEN)
+
 
 def get_next_nfp(current_date):
     month, year = current_date.month, current_date.year
@@ -268,29 +388,42 @@ def get_next_nfp(current_date):
         first_friday = date(year, month, first_friday_day)
     return first_friday
 
+
 def get_next_cpi(current_date):
     month, year = current_date.month, current_date.year
     cpi_date = date(year, month, 13)
-    if cpi_date.weekday() == 5: cpi_date = date(year, month, 12)
-    elif cpi_date.weekday() == 6: cpi_date = date(year, month, 14)
+    if cpi_date.weekday() == 5:
+        cpi_date = date(year, month, 12)
+    elif cpi_date.weekday() == 6:
+        cpi_date = date(year, month, 14)
     if current_date > cpi_date:
         month = 1 if month == 12 else month + 1
         year = year + 1 if month == 1 else year
         cpi_date = date(year, month, 13)
-        if cpi_date.weekday() == 5: cpi_date = date(year, month, 12)
-        elif cpi_date.weekday() == 6: cpi_date = date(year, month, 14)
+        if cpi_date.weekday() == 5:
+            cpi_date = date(year, month, 12)
+        elif cpi_date.weekday() == 6:
+            cpi_date = date(year, month, 14)
     return cpi_date
 
+
 def fetch_metal_price(symbol):
-    r = requests.get(f"https://api.gold-api.com/price/{symbol}", headers=HEADERS, timeout=10)
+    r = requests.get(
+        f"https://api.gold-api.com/price/{symbol}", headers=HEADERS, timeout=10
+    )
     r.raise_for_status()
     data = r.json()
     return float(data["price"]), data.get("updatedAt")
 
+
 @st.cache_data(ttl=300)
 def fetch_synthetic_dxy():
     try:
-        r = requests.get("https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,JPY,GBP,CAD,SEK,CHF", headers=HEADERS, timeout=10)
+        r = requests.get(
+            "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,JPY,GBP,CAD,SEK,CHF",
+            headers=HEADERS,
+            timeout=10,
+        )
         r.raise_for_status()
         rates = r.json()["rates"]
         dxy = (
@@ -306,12 +439,14 @@ def fetch_synthetic_dxy():
     except Exception:
         return None
 
+
 def fetch_crypto_history(coin_id, days):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": str(days), "interval": "daily"}
     r = requests.get(url, params=params, headers=HEADERS, timeout=10)
     r.raise_for_status()
     return r.json().get("prices", [])
+
 
 @st.cache_data(ttl=1800)
 def fetch_market_data():
@@ -320,18 +455,18 @@ def fetch_market_data():
         silver_spot, silver_ts = fetch_metal_price("XAG")
         gold_spot, gold_ts = fetch_metal_price("XAU")
     except Exception as e:
-        errors.append(f"gold-api.com 抓取失敗：{e}")
+        errors.append(f"gold-api error: {e}")
         return None, errors
 
     try:
         dxy = fetch_synthetic_dxy()
     except Exception as e:
-        errors.append(f"合成 DXY 計算失敗：{e}")
+        errors.append(f"DXY calc error: {e}")
         dxy = None
 
     rsi = silver_past = silver_high = silver_low = None
     gold_past = gold_high = gold_low = None
-    
+
     try:
         ag_hist = fetch_crypto_history("kinesis-silver", 30)
         if ag_hist and len(ag_hist) >= 15:
@@ -347,7 +482,7 @@ def fetch_market_data():
             silver_high = max(recent_5d)
             silver_low = min(recent_5d)
     except Exception as e:
-        errors.append(f"CoinGecko 白銀歷史抓取失敗：{e}")
+        errors.append(f"CoinGecko AG error: {e}")
 
     try:
         au_hist = fetch_crypto_history("pax-gold", 6)
@@ -357,7 +492,7 @@ def fetch_market_data():
             gold_high = max(recent_5d)
             gold_low = min(recent_5d)
     except Exception as e:
-        errors.append(f"CoinGecko 黃金歷史抓取失敗：{e}")
+        errors.append(f"CoinGecko AU error: {e}")
 
     gsr = round(gold_spot / silver_spot, 2) if silver_spot else None
 
@@ -376,111 +511,164 @@ def fetch_market_data():
         "as_of": silver_ts,
     }, errors
 
-if st.button("🔄 重新查詢", use_container_width=True):
-    st.cache_data.clear()
-    st.toast("已清除 API 快取並更新數據！", icon="✅")
 
-st.sidebar.header("📌 上海銀溢價輸入區")
+# ==========================================
+# 3. 側邊欄：控制面板與變數設定 (Properties Pane)
+# ==========================================
+st.sidebar.markdown("### 🛠️ Data Inputs & Parameters")
+
 sh_premium = st.sidebar.number_input(
-    "今日上海銀溢價 Premium (%)", step=0.1, 
+    "SH Premium Rate (%)",
+    step=0.1,
     key="sh_premium_val",
-    on_change=update_premium_cb
+    on_change=update_premium_cb,
 )
-st.sidebar.markdown("👉 **[ 即時溢價premium中國倫敦價差](https://goldsilver.ai/metal-prices/shanghai-silver-price)**")
 
 st.sidebar.markdown("---")
-st.sidebar.header("⚙️ 警示門檻微調")
-gsr_upper = st.sidebar.slider("GSR 高估門檻 (賣金買銀)", 65.0, 95.0, 80.0, 0.5, key="gsr_upper_val")
-gsr_lower = st.sidebar.slider("GSR 低估門檻 (賣銀買金)", 40.0, 65.0, 50.0, 0.5, key="gsr_lower_val")
-premium_upper = st.sidebar.slider("溢價極端門檻 (%)", 15.0, 30.0, 20.0, 0.5, key="premium_upper_val")
-premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", 0.0, 15.0, 10.0, 0.5, key="premium_lower_val")
+st.sidebar.markdown("**Threshold Settings**")
+gsr_upper = st.sidebar.slider(
+    "GSR Upper Limit", 65.0, 95.0, 80.0, 0.5, key="gsr_upper_val"
+)
+gsr_lower = st.sidebar.slider(
+    "GSR Lower Limit", 40.0, 65.0, 50.0, 0.5, key="gsr_lower_val"
+)
+premium_upper = st.sidebar.slider(
+    "Premium Threshold (%)", 15.0, 30.0, 20.0, 0.5, key="premium_upper_val"
+)
 
 st.sidebar.markdown("---")
-st.sidebar.header("🛠️ 工具與線上記事本")
-
-with st.sidebar.expander("📝 臨時心得牆", expanded=True):
-    st.markdown("**【線上記事本 (上限10則)】**")
-    
+with st.sidebar.expander("📝 Scratchpad / Memo", expanded=True):
     current_data = load_data()
     notes = [n for n in current_data.get("notes_history", []) if n.strip()]
     if notes:
         for idx, note_text in enumerate(notes, 1):
-            clean_text = re.sub(r'^\d+[\.\、]\s*', '', note_text)
-            st.markdown(f"**{idx}.** {clean_text}")
+            clean_text = re.sub(r"^\d+[\.\、]\s*", "", note_text)
+            st.markdown(f"`[{idx}]` {clean_text}")
     else:
-        st.caption("目前尚無記事紀錄")
-        
-    st.markdown("---")
-    st.text_input("✍️ 臨時心得上限10000/D：", key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Enter 儲存...")
+        st.caption("No log entries.")
+
+    st.text_input(
+        "Add Log:",
+        key="trading_note_val",
+        on_change=update_note_cb,
+        placeholder="Enter text...",
+    )
 
 st.sidebar.markdown("---")
-st.sidebar.header("📱 Telegram 測試與連線")
-if st.sidebar.button("發送測試訊息至 Telegram"):
-    if send_telegram_alert("🪙 金銀戰情室：手動測試連線成功！"):
-        st.sidebar.success("✅ 發送成功！請檢查您的 Telegram。")
+if st.sidebar.button("⚡ Test Connection"):
+    if send_telegram_alert("System Alert: Connection verified."):
+        st.sidebar.success("OK")
     else:
-        st.sidebar.error("❌ 發送失敗，請確認 Secrets 設定。")
-    
+        st.sidebar.error("Error")
+
+# ==========================================
+# 4. 主內容區域：試算表擬真展現 (Data Grid)
+# ==========================================
+
+# Formula Bar (假公式欄，極度增加真實感)
+st.markdown(
+    """
+    <div style="background:#E6E6E6; border:1px solid #C8C6C4; padding:4px 10px; font-family:Consolas, monospace; font-size:12px; margin-bottom:12px; display:flex; align-items:center;">
+        <span style="font-weight:bold; color:#107C41; margin-right:10px;">fx</span>
+        <span style="color:#505050;">=SUM(Spot_Data)*INDEX(Market_Rates, "Live")</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+c_btn, c_space = st.columns([1, 5])
+with c_btn:
+    if st.button("🔄 Refresh Data"):
+        st.cache_data.clear()
+        st.toast("Data refreshed.")
+
 market_data, fetch_errors = fetch_market_data()
 
 if fetch_errors and market_data is None:
-    st.error("⚠️ 資料抓取失敗：")
-    for e in fetch_errors: st.code(e)
+    st.error("Data Fetch Error")
 
 if market_data:
-    st.caption(f"查詢時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    st.markdown("### 📍 當日核心市場數據")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("🥈 現貨銀價 Silver (Spot)", f"${market_data['spot_silver']}")
-    c2.metric("🥇 現貨金價 GOLD (Spot)", f"${market_data['spot_gold']}")
-    c3.metric("💵 合成 DXY (校正)", market_data["dxy"] if market_data["dxy"] is not None else "查詢失敗")
+    st.markdown("##### 📍 Summary Table 1: Real-time Market Benchmarks")
 
-    c4, c5, c6 = st.columns(3)
-    c4.metric("⚖️ 金銀比 (GSR)", f"{market_data['gsr']}")
-    c5.metric("📈 白銀 Silver RSI(14)", market_data["rsi"] if market_data["rsi"] is not None else "資料不足")
-    c6.metric("🇨🇳 銀溢價 Premium", f"{st.session_state.sh_premium_val}%")
+    # 運用 6 欄位網格排列，極度類似 Excel 儲存格
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1.metric("XAG/USD (Spot)", f"${market_data['spot_silver']}")
+    col2.metric("XAU/USD (Spot)", f"${market_data['spot_gold']}")
+    col3.metric("DXY Index", market_data["dxy"] if market_data["dxy"] else "N/A")
+    col4.metric("GSR Ratio", f"{market_data['gsr']}")
+    col5.metric(
+        "AG RSI(14)",
+        market_data["rsi"] if market_data["rsi"] else "N/A",
+    )
+    col6.metric("SH Premium", f"{st.session_state.sh_premium_val}%")
 
     st.markdown("---")
-    st.markdown("### 🚨 當日套利與轉置建議")
-    today = datetime.now().date()
-    st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
 
-# --- 放在主畫面最下方的「多語戰情室留言板」 ---
+    today = datetime.now().date()
+    st.markdown("##### 📍 Summary Table 2: System Status & Schedule")
+
+    # 使用表格 DataFrame 渲染，比單純文字更有「Excel」味道
+    status_df = pd.DataFrame(
+        [
+            {
+                "Data Source Timestamp": market_data["as_of"],
+                "Next NFP Target": str(get_next_nfp(today)),
+                "Next CPI Target": str(get_next_cpi(today)),
+                "Engine Status": "ACTIVE / NORMAL",
+            }
+        ]
+    )
+    st.dataframe(status_df, use_container_width=True, hide_index=True)
+
+# ==========================================
+# 5. 多語留言板 (Communication Log)
+# ==========================================
 st.markdown("---")
-st.markdown("### 📋 多語戰情室留言板 (Multilingual Message Board)")
-st.caption("在此輸入訊息，系統將自動翻譯並記錄最近 20 則留言。可透過 Telegram 隨時發送與查詢最新留言。")
+st.markdown("##### 📋 Communication Log (Multilingual Archive)")
+
 
 def add_chat_cb():
     raw_text = st.session_state.get("new_chat_val", "")
     if raw_text.strip():
         try:
-            src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', raw_text) else 'auto'
-            trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
-            trans_en = GoogleTranslator(source=src_lang, target='en').translate(raw_text)
-            trans_vi = GoogleTranslator(source=src_lang, target='vi').translate(raw_text)
-            
+            src_lang = "zh-TW" if re.search(r"[\u4e00-\u9fa5]", raw_text) else "auto"
+            trans_zh = GoogleTranslator(
+                source=src_lang, target="zh-TW"
+            ).translate(raw_text)
+            trans_en = GoogleTranslator(
+                source=src_lang, target="en"
+            ).translate(raw_text)
+            trans_vi = GoogleTranslator(
+                source=src_lang, target="vi"
+            ).translate(raw_text)
             formatted_msg = f"🇬🇧 {trans_en}\n\n🇨🇳 {trans_zh} ｜ 🇻🇳 {trans_vi}"
         except Exception:
-            formatted_msg = f"🇬🇧 {raw_text}\n\n*(⚠️ 翻譯失敗)*"
-            
+            formatted_msg = f"🇬🇧 {raw_text}\n\n*(Translation Failed)*"
+
         data = load_data()
-        if "chat_history" not in data: data["chat_history"] = []
+        if "chat_history" not in data:
+            data["chat_history"] = []
         data["chat_history"].append(formatted_msg)
         if len(data["chat_history"]) > 20:
             data["chat_history"].pop(0)
         save_data(data)
         st.session_state.new_chat_val = ""
 
-st.text_input("✍️ 留言與多語翻譯(上限10000/D)：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入內容後按 Enter 提交...")
+
+st.text_input(
+    "Input text to append log:",
+    key="new_chat_val",
+    on_change=add_chat_cb,
+    placeholder="Type message and press Enter...",
+)
 
 data = load_data()
 chat_history = data.get("chat_history", [])
 if chat_history:
-    for chat in chat_history:
+    for chat in reversed(chat_history):  # 新訊息在最上面，比較符合工作表邏輯
         with st.container(border=True):
             st.markdown(chat)
 else:
-    st.info("目前尚無留言紀錄，趕快在上方留下第一則訊息吧！")
-    
-st.divider()
-st.caption("以上僅供研究參考，不構成投資建議，各人造業各人擔。")
+    st.info("No records found.")
+
+st.caption("Internal Data Sheet - Confidential / For Internal Operations Only")
