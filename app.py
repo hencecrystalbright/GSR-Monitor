@@ -147,9 +147,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.caption(
-    "數據來源：gold-api.com（現貨）10/m＋ Frankfurter（DXY）1/3m＋"
-    " CoinGecko（RSI/5日波段）1/10m+"
-    " jsonbin.io 10000/D"
+    "數據來源：gold-api.com（現貨）10/m ＋ Frankfurter（DXY）1/3m ＋"
+    " CoinGecko（RSI/5日波段）1/10m ＋"
+    " jsonbin.io  10000/D"
 )
 st.markdown("---")
 
