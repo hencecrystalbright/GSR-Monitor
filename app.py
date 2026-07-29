@@ -572,7 +572,7 @@ sh_premium = st.sidebar.number_input(
     on_change=update_premium_cb,
 )
 st.sidebar.markdown(
-    "👉 **[ 即時溢價premium中國倫敦價差](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
+    "👉 **[ Ai即時溢價premium](https://goldsilver.ai/metal-prices/shanghai-silver-price)**"
 )
 
 st.sidebar.markdown("---")
