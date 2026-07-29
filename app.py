@@ -38,7 +38,7 @@ def load_data():
                 # 兼容舊版單筆筆記，若無 notes_history 則轉為陣列
                 if "notes_history" not in data:
                     old_note = data.get("trading_note", "")
-                    data["notes_history"] = [old_note] if old_note else ["1. 達極端溢價時避開 COMEX 空單"]
+                    data["notes_history"] = [old_note] if old_note else [""]
                 if "sh_premium" not in data: data["sh_premium"] = 12.22
                 return data
         except Exception:
