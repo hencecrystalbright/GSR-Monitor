@@ -620,9 +620,9 @@ if market_data:
         else:
             st.caption("黃金 5日波段歷史資料計算中...")
 
-# --- 放在主畫面最下方的「多語戰情室留言板」 ---
+# --- 放在主畫面最下方的「多語留言板」 ---
 st.markdown("---")
-st.markdown("### 📋 多語戰情室留言板 (Multilingual Message Board)")
+st.markdown("### 📋 多語留言板 (Multilingual Message Board)")
 st.caption("在此輸入訊息，系統將自動翻譯並記錄最近 20 則留言。可透過 Telegram 隨時發送與查詢最新留言。")
 
 def add_chat_cb():
