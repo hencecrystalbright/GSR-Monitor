@@ -561,7 +561,7 @@ if market_data:
     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### 🚨 當日套利與轉置建議")
+    st.markdown("### 🚨 Daily comments")
     today = datetime.now().date()
     st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
 
