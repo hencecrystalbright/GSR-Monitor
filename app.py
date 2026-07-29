@@ -471,7 +471,7 @@ def add_chat_cb():
         save_data(data)
         st.session_state.new_chat_val = ""
 
-st.text_input("✍️ 新增留言與多語翻譯：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入內容後按 Enter 提交...")
+st.text_input("✍️ 留言與多語翻譯(上限10000/日)：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入內容後按 Enter 提交...")
 
 data = load_data()
 chat_history = data.get("chat_history", [])
