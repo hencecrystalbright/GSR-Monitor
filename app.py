@@ -411,7 +411,7 @@ with st.sidebar.expander("📝 臨時心得牆", expanded=True):
         st.caption("目前尚無記事紀錄")
         
     st.markdown("---")
-    st.text_input("✍️ 臨時心得上限10000/日：", key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Enter 儲存...")
+    st.text_input("✍️ 臨時心得上限10000/D：", key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Enter 儲存...")
 
 st.sidebar.markdown("---")
 st.sidebar.header("📱 Telegram 測試與連線")
@@ -471,7 +471,7 @@ def add_chat_cb():
         save_data(data)
         st.session_state.new_chat_val = ""
 
-st.text_input("✍️ 留言與多語翻譯(上限10000/日)：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入內容後按 Enter 提交...")
+st.text_input("✍️ 留言與多語翻譯(上限10000/D)：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入內容後按 Enter 提交...")
 
 data = load_data()
 chat_history = data.get("chat_history", [])
