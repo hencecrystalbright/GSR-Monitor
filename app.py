@@ -26,26 +26,83 @@ st.caption("數據來源：gold-api.com（現貨）10/m＋ Frankfurter（DXY）1
 st.markdown("---")
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
-DATA_FILE = "data.json"
+DATA_FILE = "data.json"  # 僅作為「尚未設定 JSONBin 時」的本機備援，重開機會遺失，不建議長期依賴
+
+# --- 持久化儲存：改用 JSONBin.io 雲端 JSON 儲存，取代不可靠的本機檔案 ---
+# Streamlit Community Cloud 的容器本機硬碟並非永久保存，容器一旦被重建
+# （休眠喚醒、重新部署、平台資源回收）本機檔案就會消失，導致 sh_premium/notes/chat
+# 全部被打回預設值。改存到容器外部的 JSONBin.io，才不會受容器重建影響。
+# 請至 Streamlit Cloud → Manage app → Settings → Secrets 設定：
+#   JSONBIN_API_KEY = "你的 X-Master-Key"
+#   JSONBIN_BIN_ID  = "你的 Bin ID"
+JSONBIN_API_KEY = st.secrets.get("JSONBIN_API_KEY", None)
+JSONBIN_BIN_ID = st.secrets.get("JSONBIN_BIN_ID", None)
+JSONBIN_URL = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}" if JSONBIN_BIN_ID else None
+PERSIST_ENABLED = bool(JSONBIN_URL and JSONBIN_API_KEY)
+
+if not PERSIST_ENABLED:
+    st.sidebar.warning(
+        "⚠️ 尚未設定 JSONBin 雲端儲存（JSONBIN_API_KEY / JSONBIN_BIN_ID）。"
+        "目前資料僅寫在容器本機，App 休眠喚醒或重新部署後會被重置為預設值。"
+    )
+
+def _default_data():
+    return {"sh_premium": 12.22, "notes_history": [], "chat_history": []}
+
+def _normalize(data):
+    if "chat_history" not in data: data["chat_history"] = []
+    if "notes_history" not in data: data["notes_history"] = []
+    if "sh_premium" not in data: data["sh_premium"] = 12.22
+    return data
 
 def load_data():
-    # 💡 強制初始狀態為空陣列，不要有任何預設文字
-    default_data = {"sh_premium": 12.22, "notes_history": [], "chat_history": []}
+    if PERSIST_ENABLED:
+        try:
+            r = requests.get(
+                f"{JSONBIN_URL}/latest",
+                headers={"X-Master-Key": JSONBIN_API_KEY},
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json().get("record", {})
+            if not isinstance(data, dict) or not data:
+                data = _default_data()
+                save_data(data)
+            return _normalize(data)
+        except Exception as e:
+            print(f"[JSONBin load error] {e}")
+            return _default_data()
+
+    # 本機備援（尚未設定 JSONBin 時使用，重開機/容器重建會遺失，僅供測試）
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if "chat_history" not in data: data["chat_history"] = []
-                if "notes_history" not in data: data["notes_history"] = []
-                if "sh_premium" not in data: data["sh_premium"] = 12.22
-                return data
+                return _normalize(json.load(f))
         except Exception:
             pass
+    default_data = _default_data()
     save_data(default_data)
     return default_data
 
 def save_data(data):
-    if not isinstance(data, dict): return
+    if not isinstance(data, dict):
+        return
+    if PERSIST_ENABLED:
+        try:
+            requests.put(
+                JSONBIN_URL,
+                json=data,
+                headers={
+                    "X-Master-Key": JSONBIN_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"[JSONBin save error] {e}")
+        return
+
+    # 本機備援
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -159,7 +216,6 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     
-    # 💡 確保過濾掉任何空白字串
     notes = [n for n in data.get("notes_history", []) if n.strip()]
     notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)]) if notes else "目前無筆記"
     
@@ -345,7 +401,6 @@ with st.sidebar.expander("📝 臨時心得牆", expanded=True):
     st.markdown("**【線上記事本 (上限10則)】**")
     
     current_data = load_data()
-    # 過濾空白紀錄，確保版面乾淨
     notes = [n for n in current_data.get("notes_history", []) if n.strip()]
     if notes:
         for idx, note_text in enumerate(notes, 1):
@@ -357,7 +412,6 @@ with st.sidebar.expander("📝 臨時心得牆", expanded=True):
     st.markdown("---")
     st.text_input("✍️ 新增臨時心得：", key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Enter 儲存...")
 
-# 💡 找回來的 Telegram 手動測試按鈕
 st.sidebar.markdown("---")
 st.sidebar.header("📱 Telegram 測試與連線")
 if st.sidebar.button("發送測試訊息至 Telegram"):
@@ -418,7 +472,6 @@ def add_chat_cb():
 
 st.text_input("✍️ 新增留言與多語翻譯：", key="new_chat_val", on_change=add_chat_cb, placeholder="輸入內容後按 Enter 提交...")
 
-# 渲染歷史留言牆 (美化卡片外觀)
 data = load_data()
 chat_history = data.get("chat_history", [])
 if chat_history:
