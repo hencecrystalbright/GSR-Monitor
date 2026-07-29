@@ -29,7 +29,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 DATA_FILE = "data.json"
 
 def load_data():
-    default_data = {"sh_premium": 12.22, "notes_history": ["1. 達極端溢價時避開 COMEX 空單", "2. GSR 突破門檻分批套利", "3. 嚴格執行止損"], "chat_history": []}
+    default_data = {"sh_premium": 12.22, "notes_history": [""], "chat_history": []}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
