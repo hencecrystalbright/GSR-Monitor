@@ -29,16 +29,14 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 DATA_FILE = "data.json"
 
 def load_data():
-    default_data = {"sh_premium": 12.22, "notes_history": [""], "chat_history": []}
+    # 💡 強制初始狀態為空陣列，不要有任何預設文字
+    default_data = {"sh_premium": 12.22, "notes_history": [], "chat_history": []}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if "chat_history" not in data: data["chat_history"] = []
-                # 兼容舊版單筆筆記，若無 notes_history 則轉為陣列
-                if "notes_history" not in data:
-                    old_note = data.get("trading_note", "")
-                    data["notes_history"] = [old_note] if old_note else [""]
+                if "notes_history" not in data: data["notes_history"] = []
                 if "sh_premium" not in data: data["sh_premium"] = 12.22
                 return data
         except Exception:
@@ -59,10 +57,10 @@ def update_premium_cb():
 # 網頁端新增筆記回調（最多保留 10 則，先進先出）
 def update_note_cb():
     raw_text = st.session_state.get("trading_note_val", "")
-    if raw_text:
+    if raw_text.strip():
         data = load_data()
         if "notes_history" not in data: data["notes_history"] = []
-        data["notes_history"].append(raw_text)
+        data["notes_history"].append(raw_text.strip())
         if len(data["notes_history"]) > 10:
             data["notes_history"].pop(0)
         save_data(data)
@@ -78,6 +76,15 @@ except Exception:
     BOT_TOKEN = None
     ALLOWED_CHAT_ID = None
     st.sidebar.error("⚠️ 尚未設定 Telegram Secrets，推播與雙向控制功能停用。")
+
+def send_telegram_alert(message):
+    if not BOT_TOKEN or not ALLOWED_CHAT_ID: return False
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    try:
+        r = requests.post(url, json={"chat_id": ALLOWED_CHAT_ID, "text": message}, timeout=10)
+        return r.status_code == 200
+    except Exception:
+        return False
 
 # --- Telegram 機器人非同步控制函數 ---
 async def tg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -152,8 +159,8 @@ async def tg_get_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_chat.id).strip() != str(ALLOWED_CHAT_ID).strip(): return
     data = load_data()
     
-    # 💡 修正：正確讀取 notes_history 陣列
-    notes = data.get("notes_history", [])
+    # 💡 確保過濾掉任何空白字串
+    notes = [n for n in data.get("notes_history", []) if n.strip()]
     notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)]) if notes else "目前無筆記"
     
     history = data.get("chat_history", [])
@@ -190,15 +197,6 @@ def init_telegram_bot(token):
 
 if BOT_TOKEN:
     init_telegram_bot(BOT_TOKEN)
-
-def send_telegram_alert(message):
-    if not BOT_TOKEN or not ALLOWED_CHAT_ID: return False
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    try:
-        r = requests.post(url, json={"chat_id": ALLOWED_CHAT_ID, "text": message}, timeout=10)
-        return r.status_code == 200
-    except Exception:
-        return False
 
 def get_next_nfp(current_date):
     month, year = current_date.month, current_date.year
@@ -347,29 +345,26 @@ with st.sidebar.expander("📝 臨時心得牆", expanded=True):
     st.markdown("**【線上記事本 (上限10則)】**")
     
     current_data = load_data()
-    notes = current_data.get("notes_history", [])
+    # 過濾空白紀錄，確保版面乾淨
+    notes = [n for n in current_data.get("notes_history", []) if n.strip()]
     if notes:
         for idx, note_text in enumerate(notes, 1):
-            # 💡 自動清洗：如果文字本身已經帶有數字編號（例如 "1. " 或 "1."），我們把它過濾掉，避免雙重編號
             clean_text = re.sub(r'^\d+[\.\、]\s*', '', note_text)
             st.markdown(f"**{idx}.** {clean_text}")
     else:
-        st.caption("目前無記事紀錄")
+        st.caption("目前尚無記事紀錄")
         
     st.markdown("---")
-    
-    def add_note_cb():
-        raw_text = st.session_state.get("trading_note_val", "")
-        if raw_text:
-            data = load_data()
-            if "notes_history" not in data: data["notes_history"] = []
-            data["notes_history"].append(raw_text)
-            if len(data["notes_history"]) > 10:
-                data["notes_history"].pop(0)
-            save_data(data)
-            st.session_state.trading_note_val = ""
+    st.text_input("✍️ 新增臨時心得：", key="trading_note_val", on_change=update_note_cb, placeholder="輸入後按 Enter 儲存...")
 
-    st.text_input("✍️ 新增臨時心得：", key="trading_note_val", on_change=add_note_cb, placeholder="輸入後按 Enter 儲存...")
+# 💡 找回來的 Telegram 手動測試按鈕
+st.sidebar.markdown("---")
+st.sidebar.header("📱 Telegram 測試與連線")
+if st.sidebar.button("發送測試訊息至 Telegram"):
+    if send_telegram_alert("🪙 金銀戰情室：手動測試連線成功！"):
+        st.sidebar.success("✅ 發送成功！請檢查您的 Telegram。")
+    else:
+        st.sidebar.error("❌ 發送失敗，請確認 Secrets 設定。")
     
 market_data, fetch_errors = fetch_market_data()
 
@@ -402,7 +397,7 @@ st.caption("在此輸入訊息，系統將自動翻譯並記錄最近 20 則留�
 
 def add_chat_cb():
     raw_text = st.session_state.get("new_chat_val", "")
-    if raw_text:
+    if raw_text.strip():
         try:
             src_lang = 'zh-TW' if re.search(r'[\u4e00-\u9fa5]', raw_text) else 'auto'
             trans_zh = GoogleTranslator(source=src_lang, target='zh-TW').translate(raw_text)
