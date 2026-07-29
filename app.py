@@ -593,7 +593,7 @@ premium_lower = st.sidebar.slider(
 st.sidebar.markdown("---")
 st.sidebar.header("🛠️ 工具與線上記事本")
 
-with st.sidebar.expander("📝 臨時心得牆", expanded=True):
+with st.sidebar.expander("📝 心得牆", expanded=True):
     st.markdown("**【線上記事本 (上限10則)】**")
 
     current_data = load_data()
@@ -607,7 +607,7 @@ with st.sidebar.expander("📝 臨時心得牆", expanded=True):
 
     st.markdown("---")
     st.text_input(
-        "✍️ 新增臨時心得：",
+        "✍️ 新增臨時心得(10000/D)：",
         key="trading_note_val",
         on_change=update_note_cb,
         placeholder="輸入後按 Enter 儲存...",
@@ -835,7 +835,7 @@ def add_chat_cb():
 
 
 st.text_input(
-    "✍️ 新增留言與多語翻譯：",
+    "✍️ 新增留言與多語翻譯(10000/D by jsonbin.io/)：",
     key="new_chat_val",
     on_change=add_chat_cb,
     placeholder="輸入內容後按 Enter 提交...",
