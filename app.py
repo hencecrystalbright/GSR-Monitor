@@ -25,7 +25,7 @@ st.markdown(
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Calibri&family=Segoe+UI&display=swap');
 
-    /* 隱藏 Streamlit 原生元素，降低「這是網頁」的既視感 */
+    /* 隱藏 Streamlit 原生元素 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header[data-testid="stHeader"] {background: transparent;}
@@ -38,13 +38,13 @@ st.markdown(
         background-color: #FFFFFF;
     }
 
-    /* 側邊欄偽裝成「活頁簿工作窗格」 */
+    /* 側邊欄偽裝成工作窗格 */
     section[data-testid="stSidebar"] {
         background-color: #F3F2F1;
         border-right: 1px solid #D0D0D0;
     }
 
-    /* 按鈕做成 Excel 功能區按鈕的樣式 */
+    /* 按鈕 Excel 化 */
     .stButton>button {
         background: linear-gradient(#FFFFFF, #F0F0F0);
         border: 1px solid #C0C0C0;
@@ -58,7 +58,7 @@ st.markdown(
         border-color: #217346;
     }
 
-    /* Metric 卡片做成試算表儲存格樣式 */
+    /* Metric 卡片儲存格化 */
     div[data-testid="stMetric"] {
         background-color: #FFFFFF;
         border: 1px solid #D0D0D0;
@@ -84,23 +84,27 @@ st.markdown(
         border-radius: 4px !important;
     }
     div[data-testid="stAlert"] svg {
-        fill: #2B6CB0 !important;              /* 圖示改為沉穩藍色 */
+        fill: #2B6CB0 !important;              /* 圖示沉穩藍 */
     }
 
     /* ---------------------------------------------------- */
-    /* 🎯 2. 側邊欄 Slider 顏色微調                           */
+    /* 🎯 2. 全域 Slider 變色修復 (墨綠色滑桿 / 黑色文字)  */
     /* ---------------------------------------------------- */
-    /* 滑桿本體 (軌道已填滿部分 + 圓點) 改為「墨綠色」 */
-    div[data-testid="stSlider"] div[data-baseweb="slider"] div[style*="background-color: rgb"] {
-        background-color: #217346 !important;
-    }
-    div[data-testid="stSlider"] div[role="slider"] {
+    /* 強制修改底層進度條與拖曳圓點為墨綠色 */
+    div[data-testid="stSlider"] [role="slider"] {
         background-color: #217346 !important;
         border-color: #217346 !important;
         box-shadow: none !important;
     }
+    div[data-testid="stSlider"] [data-baseweb="slider"] div {
+        background-color: #217346 !important;
+    }
+    /* 恢復上軌道/未選取部分的淡灰色 */
+    div[data-testid="stSlider"] [data-baseweb="slider"] > div > div:first-child {
+        background-color: #D4D4D4 !important;
+    }
 
-    /* 滑桿相關文字 (標題、極值與當前數值) 全部恢復為「黑色/深灰」 */
+    /* 滑桿文字與數字標籤保持深灰色 */
     div[data-testid="stSlider"] label,
     div[data-testid="stSlider"] label p,
     div[data-testid="stSlider"] [data-testid="stMarkdownContainer"] p,
@@ -138,7 +142,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- 假功能區 Ribbon + 公式列（純裝飾，不具功能） ---
+# --- 假功能區 Ribbon + 公式列 ---
 st.markdown(
     """
 <div style="background:#F3F2F1; border-bottom:1px solid #D0D0D0; padding:4px 10px; font-size:13px; color:#444; display:flex; gap:18px;">
@@ -690,12 +694,66 @@ if market_data:
         f" 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`"
     )
 
-    # --- 📐 0.618 費波那契波段與套利延伸分析 ---
+    # --- ⚖️ 1. 金銀比 (GSR) 與上海銀套利動態建議 ---
+    current_gsr = market_data.get("gsr")
+    current_prem = st.session_state.sh_premium_val
+
+    st.markdown("#### ⚖️ GSR 金銀比與套利策略建議")
+
+    c_gsr_strat, c_prem_strat = st.columns(2)
+
+    with c_gsr_strat:
+        st.markdown("**📊 GSR 跨金屬套利建議**")
+        if current_gsr:
+            if current_gsr >= gsr_upper:
+                st.warning(
+                    f"🚨 **GSR 目前為 {current_gsr}（≥ 門檻 {gsr_upper}）**：\n"
+                    "白銀相對黃金**嚴重低估**！操作建議：**【賣金買銀 /"
+                    " 多銀空金】**，博取金銀比均值回歸。"
+                )
+            elif current_gsr <= gsr_lower:
+                st.warning(
+                    f"🚨 **GSR 目前為 {current_gsr}（≤ 門檻 {gsr_lower}）**：\n"
+                    "白銀相對黃金**顯著高估**！操作建議：**【賣銀買金 /"
+                    " 多金空銀】**，防範白銀補跌風險。"
+                )
+            else:
+                st.success(
+                    f"✅ **GSR 目前為 {current_gsr}**（介於設定門檻 {gsr_lower} ~"
+                    f" {gsr_upper} 之間）：\n"
+                    "金銀比處於**合理中性區間**，建議保持不動，觀察波段趨勢。"
+                )
+        else:
+            st.caption("GSR 資料計算中...")
+
+    with c_prem_strat:
+        st.markdown("**🇨🇳 上海銀 Premium 溢價建議**")
+        if current_prem >= premium_upper:
+            st.warning(
+                f"🚨 **上海銀溢價達 {current_prem}%（≥ 門檻"
+                f" {premium_upper}%）**：\n"
+                "國內需求極度高企或流動性緊縮，極端溢價警示，留意回吐修正。"
+            )
+        elif current_prem <= premium_lower:
+            st.info(
+                f"💡 **上海銀溢價為 {current_prem}%（≤ 門檻"
+                f" {premium_lower}%）**：\n"
+                "國內外價差收斂，市場情緒平穩，適合佈局長線價差套利。"
+            )
+        else:
+            st.success(
+                f"✅ **上海銀溢價為 {current_prem}%**：處於正常溢價區間"
+                f"（{premium_lower}% ~ {premium_upper}%）。"
+            )
+
+    st.markdown("---")
+
+    # --- 📐 2. 0.618 費波那契波段分析 ---
     st.markdown("#### 📐 5日波段與 0.618 黃金分割延伸位")
 
     col_ag, col_au = st.columns(2)
 
-    # 1. 白銀 0.618 計算
+    # 白銀 0.618 計算
     ag_spot = market_data.get("spot_silver")
     ag_high = market_data.get("silver_high")
     ag_low = market_data.get("silver_low")
@@ -704,12 +762,8 @@ if market_data:
         st.markdown("**🥈 白銀 (Silver) 5日區間與 0.618**")
         if ag_spot and ag_high and ag_low and ag_high > ag_low:
             ag_diff = ag_high - ag_low
-            ag_fib_sup = round(
-                ag_high - (ag_diff * 0.618), 2
-            )  # 0.618 回檔支撐
-            ag_fib_res = round(
-                ag_low + (ag_diff * 0.618), 2
-            )  # 0.618 反彈壓力
+            ag_fib_sup = round(ag_high - (ag_diff * 0.618), 2)
+            ag_fib_res = round(ag_low + (ag_diff * 0.618), 2)
 
             st.write(f"• **5日高低區間：** `${ag_low}` - `${ag_high}`")
             st.write(f"• **0.618 關鍵支撐：** `${ag_fib_sup}`")
@@ -729,7 +783,7 @@ if market_data:
         else:
             st.caption("白銀 5日波段歷史資料計算中...")
 
-    # 2. 黃金 0.618 計算
+    # 黃金 0.618 計算
     au_spot = market_data.get("spot_gold")
     au_high = market_data.get("gold_high")
     au_low = market_data.get("gold_low")
@@ -738,12 +792,8 @@ if market_data:
         st.markdown("**🥇 黃金 (Gold) 5日區間與 0.618**")
         if au_spot and au_high and au_low and au_high > au_low:
             au_diff = au_high - au_low
-            au_fib_sup = round(
-                au_high - (au_diff * 0.618), 1
-            )  # 0.618 回檔支撐
-            au_fib_res = round(
-                au_low + (au_diff * 0.618), 1
-            )  # 0.618 反彈壓力
+            au_fib_sup = round(au_high - (au_diff * 0.618), 1)
+            au_fib_res = round(au_low + (au_diff * 0.618), 1)
 
             st.write(f"• **5日高低區間：** `${au_low}` - `${au_high}`")
             st.write(f"• **0.618 關鍵支撐：** `${au_fib_sup}`")
