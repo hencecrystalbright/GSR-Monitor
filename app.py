@@ -649,8 +649,8 @@ if market_data:
       </tr>
       <tr>
         <td class="xl-rowhead">1</td>
-        <td class="xl-label">現貨銀價 Spot</td>
-        <td class="xl-label">現貨金價 Spot</td>
+        <td class="xl-label">現貨銀 Silver</td>
+        <td class="xl-label">現貨金 Gold</td>
         <td class="xl-label">合成 DXY</td>
         <td class="xl-label">金銀比 GSR</td>
         <td class="xl-label">白銀 RSI(14)</td>
