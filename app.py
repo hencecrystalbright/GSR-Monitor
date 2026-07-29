@@ -135,7 +135,7 @@ st.markdown(
 <div style="background:#FFFFFF; border-bottom:1px solid #D0D0D0; padding:5px 10px; font-size:12.5px; color:#444; display:flex; align-items:center; gap:10px;">
     <span style="border:1px solid #C0C0C0; padding:1px 8px; border-radius:2px; background:#FAFAFA;">A1</span>
     <span style="color:#999;">fx</span>
-    <span style="color:#666;">=老闆我有好好工作()</span>
+    <span style="color:#666;">=老闆我是個好牛馬()</span>
 </div>
 """,
     unsafe_allow_html=True,
