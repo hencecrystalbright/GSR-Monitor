@@ -565,6 +565,61 @@ if market_data:
     today = datetime.now().date()
     st.info(f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：** 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`")
 
+    # --- 📐 0.618 費波那契波段與套利延伸分析 ---
+    st.markdown("#### 📐 5日波段與 0.618 黃金分割延伸位")
+    
+    col_ag, col_au = st.columns(2)
+    
+    # 1. 白銀 0.618 計算
+    ag_spot = market_data.get("spot_silver")
+    ag_high = market_data.get("silver_high")
+    ag_low = market_data.get("silver_low")
+    
+    with col_ag:
+        st.markdown("**🥈 白銀 (Silver) 5日區間與 0.618**")
+        if ag_spot and ag_high and ag_low and ag_high > ag_low:
+            ag_diff = ag_high - ag_low
+            ag_fib_sup = round(ag_high - (ag_diff * 0.618), 2)  # 0.618 回檔支撐
+            ag_fib_res = round(ag_low + (ag_diff * 0.618), 2)   # 0.618 反彈壓力
+            
+            st.write(f"• **5日高低區間：** `${ag_low}` - `${ag_high}`")
+            st.write(f"• **0.618 關鍵支撐：** `${ag_fib_sup}`")
+            st.write(f"• **0.618 關鍵壓力：** `${ag_fib_res}`")
+            
+            if ag_spot <= ag_fib_sup:
+                st.warning("⚠️ 現價低於 0.618 支撐位：短線有超跌反彈機會，可留意多頭套利。")
+            elif ag_spot >= ag_fib_res:
+                st.warning("⚠️ 現價高於 0.618 壓力位：短線進入強勢衝高區，注意上方獲利回吐賣壓。")
+            else:
+                st.success("✅ 現價處於 0.618 費波那契合理波段區間。")
+        else:
+            st.caption("白銀 5日波段歷史資料計算中...")
+
+    # 2. 黃金 0.618 計算
+    au_spot = market_data.get("spot_gold")
+    au_high = market_data.get("gold_high")
+    au_low = market_data.get("gold_low")
+    
+    with col_au:
+        st.markdown("**🥇 黃金 (Gold) 5日區間與 0.618**")
+        if au_spot and au_high and au_low and au_high > au_low:
+            au_diff = au_high - au_low
+            au_fib_sup = round(au_high - (au_diff * 0.618), 1)  # 0.618 回檔支撐
+            au_fib_res = round(au_low + (au_diff * 0.618), 1)   # 0.618 反彈壓力
+            
+            st.write(f"• **5日高低區間：** `${au_low}` - `${au_high}`")
+            st.write(f"• **0.618 關鍵支撐：** `${au_fib_sup}`")
+            st.write(f"• **0.618 關鍵壓力：** `${au_fib_res}`")
+            
+            if au_spot <= au_fib_sup:
+                st.warning("⚠️ 現價低於 0.618 支撐位：黃金短線回檔至黃金分割低位。")
+            elif au_spot >= au_fib_res:
+                st.warning("⚠️ 現價高於 0.618 壓力位：黃金短線逼近波段壓力位。")
+            else:
+                st.success("✅ 現價處於 0.618 費波那契合理波段區間。")
+        else:
+            st.caption("黃金 5日波段歷史資料計算中...")
+
 # --- 放在主畫面最下方的「多語戰情室留言板」 ---
 st.markdown("---")
 st.markdown("### 📋 多語戰情室留言板 (Multilingual Message Board)")
