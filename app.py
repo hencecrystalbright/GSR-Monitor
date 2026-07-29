@@ -113,7 +113,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown(
-    "<h2 style='margin-top:10px;'>📗 Q3_貴金屬總表"
+    "<h2 style='margin-top:10px;'>📗 Q3_metal index"
     "<span style='font-size: 0.5em; color: grey;'>　Daily Gold &amp; Silver Market Monitor</span></h2>", 
     unsafe_allow_html=True
 )
@@ -522,8 +522,8 @@ if fetch_errors and market_data is None:
     for e in fetch_errors: st.code(e)
 
 if market_data:
-    st.caption(f"查詢時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    st.markdown("### 📍 當日核心市場數據")
+    st.caption(f"checked time：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.markdown("### 📍 Daily data")
 
     dxy_disp = market_data["dxy"] if market_data["dxy"] is not None else "N/A"
     rsi_disp = market_data["rsi"] if market_data["rsi"] is not None else "N/A"
