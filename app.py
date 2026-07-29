@@ -75,7 +75,7 @@ st.markdown(
     }
 
     /* ---------------------------------------------------- */
-    /* 🎯 1. 調整 Dashboard Alert / Highlight 背景為淡藍色  */
+    /* 🎯 1. Dashboard Alert / Highlight 背景 (淡藍色底)    */
     /* ---------------------------------------------------- */
     div[data-testid="stAlert"], .stAlert {
         background-color: #E8F4F8 !important;  /* 淡藍色底 */
@@ -88,22 +88,25 @@ st.markdown(
     }
 
     /* ---------------------------------------------------- */
-    /* 🎯 2. 側邊欄 Slider 滑桿線條與圓點改為「墨綠色」     */
+    /* 🎯 2. 側邊欄 Slider 顏色微調                           */
     /* ---------------------------------------------------- */
-    /* Slider 已選取的進度條顏色 */
-    div[data-baseweb="slider"] div[style*="background-color: rgb"] {
+    /* 滑桿本體 (軌道已填滿部分 + 圓點) 改為「墨綠色」 */
+    div[data-testid="stSlider"] div[data-baseweb="slider"] div[style*="background-color: rgb"] {
         background-color: #217346 !important;
     }
-    /* Slider 拖曳按鈕 (Thumb Button) 顏色 */
-    div[data-baseweb="slider"] div[role="slider"] {
+    div[data-testid="stSlider"] div[role="slider"] {
         background-color: #217346 !important;
         border-color: #217346 !important;
         box-shadow: none !important;
     }
-    /* Slider 顯示數值之顏色 */
-    div[data-testid="stSlider"] div[data-testid="stMarkdownContainer"] p {
-        color: #217346 !important;
-        font-weight: 600;
+
+    /* 滑桿相關文字 (標題、極值與當前數值) 全部恢復為「黑色/深灰」 */
+    div[data-testid="stSlider"] label,
+    div[data-testid="stSlider"] label p,
+    div[data-testid="stSlider"] [data-testid="stMarkdownContainer"] p,
+    div[data-testid="stSlider"] div[aria-hidden="true"] {
+        color: #333333 !important;
+        font-weight: 500 !important;
     }
 
     /* Excel 儲存格網格 table 樣式 */
