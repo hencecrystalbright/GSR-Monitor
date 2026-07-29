@@ -343,8 +343,8 @@ premium_lower = st.sidebar.slider("溢價收斂門檻 (%)", 0.0, 15.0, 10.0, 0.5
 st.sidebar.markdown("---")
 st.sidebar.header("🛠️ 工具與線上記事本")
 
-with st.sidebar.expander("📝 核心紀律 & 臨時心得牆", expanded=True):
-    st.markdown("**【個人線上記事本 (上限10則)】**")
+with st.sidebar.expander("📝 臨時心得牆", expanded=True):
+    st.markdown("**【線上記事本 (上限10則)】**")
     
     current_data = load_data()
     notes = current_data.get("notes_history", [])
