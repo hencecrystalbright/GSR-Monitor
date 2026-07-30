@@ -4,7 +4,7 @@ import json
 import os
 import re
 import threading
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from deep_translator import GoogleTranslator
 import pandas as pd
@@ -16,6 +16,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 st.set_page_config(
     page_title="Q3_metal data.xlsx - Excel", page_icon="📗", layout="wide"
 )
+
+# 定義標準 UTC+7 時區 (曼谷/胡志明時區)
+TZ_UTC7 = timezone(timedelta(hours=7))
 
 # ============================================================
 # 🎨 Excel 視覺偽裝樣式（純 CSS/HTML，不影響任何運算邏輯）
@@ -76,7 +79,6 @@ st.markdown(
 
     /* ---------------------------------------------------- */
     /* 🎯 全局 Alert (st.info, st.warning, st.success) 統一色彩 */
-    /* 讓 GSR/溢價建議 與 下方 0.618 區塊 顏色 100% 完全一致   */
     /* ---------------------------------------------------- */
     div[data-testid="stAlert"], .stAlert, 
     div[data-testid="stAlert"] > div,
@@ -87,7 +89,6 @@ st.markdown(
         border-radius: 4px !important;
     }
     
-    /* 內嵌所有 SVG 圖示與 Markdown 文字顏色強制統一 */
     div[data-testid="stAlert"] p, 
     div[data-testid="stAlert"] span,
     div[data-testid="stAlert"] label {
@@ -424,17 +425,21 @@ if BOT_TOKEN:
     init_telegram_bot(BOT_TOKEN)
 
 
-# --- 📅 重大數據動態演算法 (基於現貨資料時間比對) ---
-def parse_as_of_date(as_of_str):
-    """解析 API 傳回的 ISO 時間字串為 date 物件"""
+# --- ⏰ 時區轉換與時間處理工具函數 ---
+def parse_and_convert_to_utc8(as_of_str):
+    """解析 API 的 ISO UTC 時間並自動轉為本地 UTC+8 時間格式"""
     if not as_of_str:
-        return datetime.now().date()
+        now_utc8 = datetime.now(TZ_UTC8)
+        return now_utc8.date(), now_utc8.strftime("%Y-%m-%d %H:%M:%S (UTC+8)")
+
     try:
-        # 支援 2026-07-30T01:22:20Z 或 2026-07-30 格式
         clean_str = as_of_str.replace("Z", "")
-        return datetime.fromisoformat(clean_str).date()
+        dt_utc = datetime.fromisoformat(clean_str).replace(tzinfo=timezone.utc)
+        dt_utc8 = dt_utc.astimezone(TZ_UTC8)
+        return dt_utc8.date(), dt_utc8.strftime("%Y-%m-%d %H:%M:%S (UTC+8)")
     except Exception:
-        return datetime.now().date()
+        now_utc8 = datetime.now(TZ_UTC8)
+        return now_utc8.date(), str(as_of_str)
 
 
 def get_next_nfp(ref_date):
@@ -481,7 +486,7 @@ def get_next_fomc(ref_date):
         date(2026, 9, 16),
         date(2026, 10, 28),
         date(2026, 12, 16),
-        # 2027 年預估 FOMC 日程 (備援延伸)
+        # 2027 年預估 FOMC 日程
         date(2027, 1, 27),
         date(2027, 3, 17),
         date(2027, 4, 28),
@@ -671,7 +676,9 @@ if fetch_errors and market_data is None:
         st.code(e)
 
 if market_data:
-    st.caption(f"checked time：{datetime.now().strftime('UTC%Y-%m-%d %H:%M:%S')}")
+    # 頂部 checked time 使用標準 UTC+8 時間
+    now_utc8_str = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S")
+    st.caption(f"checked time：{now_utc8_str}")
     st.markdown("### 📍 Daily data")
 
     dxy_disp = market_data["dxy"] if market_data["dxy"] is not None else "N/A"
@@ -715,14 +722,15 @@ if market_data:
     st.markdown("---")
     st.markdown("### 🚨 Daily comments")
 
-    # 精準解析「現貨資料時間 (as_of)」，並以此為基準滾動比對重大數據日期
-    ref_date = parse_as_of_date(market_data["as_of"])
+    # 將現貨時間自動轉為 UTC+8 當地時間
+    ref_date, local_as_of_str = parse_and_convert_to_utc8(market_data["as_of"])
+
     next_fomc = get_next_fomc(ref_date)
     next_nfp = get_next_nfp(ref_date)
     next_cpi = get_next_cpi(ref_date)
 
     st.info(
-        f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n"
+        f"⏱️ **現貨資料時間：** `{local_as_of_str}`\n\n"
         f"📅 **下次重大數據：** FED利率會議 `{next_fomc}` ｜ 非農 `{next_nfp}` ｜ CPI 預測 `{next_cpi}`"
     )
 
