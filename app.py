@@ -677,7 +677,7 @@ if fetch_errors and market_data is None:
 
 if market_data:
     # 頂部 checked time 使用標準 UTC+8 時間
-    now_utc8_str = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S")
+    now_utc8_str = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S (UTC+8)")
     st.caption(f"checked time：{now_utc8_str}")
     st.markdown("### 📍 Daily data")
 
