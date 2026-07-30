@@ -676,9 +676,9 @@ if fetch_errors and market_data is None:
         st.code(e)
 
 if market_data:
-    # 頂部 checked time 使用標準 UTC+8 時間
-    now_utc8_str = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S")
-    st.caption(f"checked time：{now_utc8_str}")
+    # 頂部 checked time 使用標準 UTC+ 時間
+    now_utc7_str = datetime.now(TZ_UTC7).strftime("%Y-%m-%d %H:%M:%S")
+    st.caption(f"checked time：{now_utc7_str}")
     st.markdown("### 📍 Daily data")
 
     dxy_disp = market_data["dxy"] if market_data["dxy"] is not None else "N/A"
