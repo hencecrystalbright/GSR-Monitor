@@ -17,8 +17,8 @@ st.set_page_config(
     page_title="Q3_metal data.xlsx - Excel", page_icon="📗", layout="wide"
 )
 
-# 定義標準 UTC+7 時區 (曼谷/胡志明時區)
-TZ_UTC7 = timezone(timedelta(hours=7))
+# 定義標準 UTC+8 時區 (台灣/北京/香港時區)
+TZ_UTC8 = timezone(timedelta(hours=8))
 
 # ============================================================
 # 🎨 Excel 視覺偽裝樣式（純 CSS/HTML，不影響任何運算邏輯）
@@ -676,9 +676,9 @@ if fetch_errors and market_data is None:
         st.code(e)
 
 if market_data:
-    # 頂部 checked time 使用標準 UTC+ 時間
-    now_utc7_str = datetime.now(TZ_UTC7).strftime("%Y-%m-%d %H:%M:%S")
-    st.caption(f"checked time：{now_utc7_str}")
+    # 頂部 checked time 使用標準 UTC+8 時間
+    now_utc8_str = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S")
+    st.caption(f"checked time：{now_utc8_str}")
     st.markdown("### 📍 Daily data")
 
     dxy_disp = market_data["dxy"] if market_data["dxy"] is not None else "N/A"
