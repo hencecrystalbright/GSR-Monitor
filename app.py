@@ -424,12 +424,25 @@ if BOT_TOKEN:
     init_telegram_bot(BOT_TOKEN)
 
 
-def get_next_nfp(current_date):
-    month, year = current_date.month, current_date.year
+# --- 📅 重大數據動態演算法 (基於現貨資料時間比對) ---
+def parse_as_of_date(as_of_str):
+    """解析 API 傳回的 ISO 時間字串為 date 物件"""
+    if not as_of_str:
+        return datetime.now().date()
+    try:
+        # 支援 2026-07-30T01:22:20Z 或 2026-07-30 格式
+        clean_str = as_of_str.replace("Z", "")
+        return datetime.fromisoformat(clean_str).date()
+    except Exception:
+        return datetime.now().date()
+
+
+def get_next_nfp(ref_date):
+    month, year = ref_date.month, ref_date.year
     c = calendar.monthcalendar(year, month)
     first_friday_day = c[0][4] if c[0][4] != 0 else c[1][4]
     first_friday = date(year, month, first_friday_day)
-    if current_date > first_friday:
+    if ref_date > first_friday:
         month = 1 if month == 12 else month + 1
         year = year + 1 if month == 1 else year
         c = calendar.monthcalendar(year, month)
@@ -438,14 +451,14 @@ def get_next_nfp(current_date):
     return first_friday
 
 
-def get_next_cpi(current_date):
-    month, year = current_date.month, current_date.year
+def get_next_cpi(ref_date):
+    month, year = ref_date.month, ref_date.year
     cpi_date = date(year, month, 13)
     if cpi_date.weekday() == 5:
         cpi_date = date(year, month, 12)
     elif cpi_date.weekday() == 6:
         cpi_date = date(year, month, 14)
-    if current_date > cpi_date:
+    if ref_date > cpi_date:
         month = 1 if month == 12 else month + 1
         year = year + 1 if month == 1 else year
         cpi_date = date(year, month, 13)
@@ -454,6 +467,34 @@ def get_next_cpi(current_date):
         elif cpi_date.weekday() == 6:
             cpi_date = date(year, month, 14)
     return cpi_date
+
+
+def get_next_fomc(ref_date):
+    """聯準會 FOMC 利率決策會議日程 (美東時間宣佈日，比對現貨時間)"""
+    fomc_dates = [
+        # 2026 年 FOMC 日程
+        date(2026, 1, 28),
+        date(2026, 3, 18),
+        date(2026, 4, 29),
+        date(2026, 6, 17),
+        date(2026, 7, 29),
+        date(2026, 9, 16),
+        date(2026, 10, 28),
+        date(2026, 12, 16),
+        # 2027 年預估 FOMC 日程 (備援延伸)
+        date(2027, 1, 27),
+        date(2027, 3, 17),
+        date(2027, 4, 28),
+        date(2027, 6, 16),
+        date(2027, 7, 28),
+        date(2027, 9, 22),
+        date(2027, 10, 27),
+        date(2027, 12, 15),
+    ]
+    for d in fomc_dates:
+        if d >= ref_date:
+            return d
+    return fomc_dates[-1]
 
 
 def fetch_metal_price(symbol):
@@ -673,10 +714,16 @@ if market_data:
 
     st.markdown("---")
     st.markdown("### 🚨 Daily comments")
-    today = datetime.now().date()
+
+    # 精準解析「現貨資料時間 (as_of)」，並以此為基準滾動比對重大數據日期
+    ref_date = parse_as_of_date(market_data["as_of"])
+    next_fomc = get_next_fomc(ref_date)
+    next_nfp = get_next_nfp(ref_date)
+    next_cpi = get_next_cpi(ref_date)
+
     st.info(
-        f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n📅 **下次重大數據：**"
-        f" 非農 `{get_next_nfp(today)}` ｜ CPI 預測 `{get_next_cpi(today)}`"
+        f"⏱️ **現貨資料時間：** {market_data['as_of']}\n\n"
+        f"📅 **下次重大數據：** FED利率會議 `{next_fomc}` ｜ 非農 `{next_nfp}` ｜ CPI 預測 `{next_cpi}`"
     )
 
     # --- ⚖️ 1. 金銀比 (GSR) 與上海銀套利動態建議 ---
