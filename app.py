@@ -671,7 +671,7 @@ if fetch_errors and market_data is None:
         st.code(e)
 
 if market_data:
-    st.caption(f"checked time：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.caption(f"checked time：{datetime.now().strftime('UTC%Y-%m-%d %H:%M:%S')}")
     st.markdown("### 📍 Daily data")
 
     dxy_disp = market_data["dxy"] if market_data["dxy"] is not None else "N/A"
